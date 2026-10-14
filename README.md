@@ -42,6 +42,8 @@ curl http://localhost:8081/actuator/health
 curl "http://localhost:8081/api/jobs?since=1970-01-01T00:00:00Z"
 ```
 
+`scripts/setup.sh` reads `apps/ingestion-service/.env` (created from `.env.sample`). A plain `docker compose up` ignores it and uses the defaults, unless you pass `--env-file apps/ingestion-service/.env`.
+
 The first fetch runs at the next six-hour mark, so `/api/jobs` is empty until then.
 
 ## Run the tests
