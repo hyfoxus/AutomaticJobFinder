@@ -1,0 +1,52 @@
+{
+  "job-count": 4,
+  "jobs": [
+    {
+      "id": 1,
+      "url": "https://remotive.com/remote-jobs/software-dev/job-1",
+      "title": "Java Developer 1",
+      "company_name": "Company 1",
+      "category": "Software Development",
+      "job_type": "full_time",
+      "publication_date": "2026-10-01T10:00:00",
+      "candidate_required_location": "Europe",
+      "salary": "",
+      "description": "<p>Job 1</p>"
+    },
+    {
+      "id": 2,
+      "url": "https://remotive.com/remote-jobs/software-dev/job-2",
+      "title": "Java Developer 2",
+      "company_name": "Company 2",
+      "category": "Software Development",
+      "job_type": "full_time",
+      "publication_date": "2026-10-02T10:00:00",
+      "candidate_required_location": "Europe",
+      "salary": "",
+      "description": "<p>Job 2</p>"
+    },
+    {
+      "id": 3,
+      "url": "https://remotive.com/remote-jobs/software-dev/job-3",
+      "title": "Java Developer 3",
+      "company_name": "Company 3",
+      "category": "Software Development",
+      "job_type": "full_time",
+      "publication_date": "2026-10-03T10:00:00",
+      "candidate_required_location": "Europe",
+      "salary": "",
+      "description": "<p>Job 3</p>"
+    },
+    {
+      "id": 99,
+      "url": "https://remotive.com/remote-jobs/software-dev/job-99",
+      "company_name": "Company 99",
+      "category": "Software Development",
+      "job_type": "full_time",
+      "publication_date": "2026-10-099T10:00:00",
+      "candidate_required_location": "Europe",
+      "salary": "",
+      "description": "<p>Job 99</p>"
+    }
+  ]
+}
