@@ -13,6 +13,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.flywaydb:flyway-database-postgresql'
+    implementation 'com.github.crawler-commons:crawler-commons:1.5'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     runtimeOnly 'org.postgresql:postgresql'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
