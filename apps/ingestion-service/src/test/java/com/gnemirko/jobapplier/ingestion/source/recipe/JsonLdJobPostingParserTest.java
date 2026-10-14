@@ -97,4 +97,32 @@ class JsonLdJobPostingParserTest {
         assertThat(JsonLdJobPostingParser.parseDate("yesterday")).isNull();
         assertThat(JsonLdJobPostingParser.parseDate(null)).isNull();
     }
+
+    @Test
+    void telecommuteWithCountryRequirementAndNoJobLocation() {
+        Parsed p = parse("{\"@type\":\"JobPosting\",\"title\":\"T\",\"jobLocationType\":\"TELECOMMUTE\","
+                + "\"jobLocation\":null,\"applicantLocationRequirements\":{\"@type\":\"Country\",\"name\":\"Ukraine\"}}");
+        assertThat(p.location()).isEqualTo("Remote (Ukraine)");
+    }
+
+    @Test
+    void telecommutePlusNormalJobLocation() {
+        Parsed p = parse("{\"@type\":\"JobPosting\",\"title\":\"T\",\"jobLocationType\":[\"TELECOMMUTE\"],"
+                + "\"jobLocation\":{\"address\":{\"addressLocality\":\"Wroclaw\",\"addressCountry\":\"PL\"}}}");
+        assertThat(p.location()).isEqualTo("Remote; Wroclaw, PL");
+    }
+
+    @Test
+    void requirementsGivenAsArrayOrString() {
+        Parsed p = parse("{\"@type\":\"JobPosting\",\"title\":\"T\",\"jobLocationType\":\"TELECOMMUTE\","
+                + "\"applicantLocationRequirements\":[{\"name\":\"Ukraine\"},{\"name\":\"Poland\"}]}");
+        assertThat(p.location()).isEqualTo("Remote (Ukraine); Remote (Poland)");
+        Parsed q = parse("{\"@type\":\"JobPosting\",\"title\":\"T\",\"applicantLocationRequirements\":\"Spain\"}");
+        assertThat(q.location()).isEqualTo("Remote (Spain)");
+    }
+
+    @Test
+    void noLocationFieldsGivesNullLocation() {
+        assertThat(parse("{\"@type\":\"JobPosting\",\"title\":\"T\"}").location()).isNull();
+    }
 }

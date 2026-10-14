@@ -85,7 +85,10 @@ public class IngestionService {
             if (!fits(p)) {
                 skipped++;
             } else {
-                valid.putIfAbsent(p.externalId(), p);
+                if (valid.putIfAbsent(p.externalId(), p) != null) {
+                    // Same id twice in one batch: keep the first, but make the loss visible.
+                    skipped++;
+                }
             }
         }
         Map<String, JobEntity> existing = new LinkedHashMap<>();

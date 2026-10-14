@@ -101,7 +101,7 @@ public final class JsonLdJobPostingParser {
                 identifier(n.get("identifier")),
                 title,
                 truncate(decode(named(n.get("hiringOrganization"))), MAX_COMPANY),
-                truncate(locations(n.get("jobLocation")), MAX_LOCATION),
+                truncate(location(n), MAX_LOCATION),
                 truncate(joinTexts(n.get("employmentType"), ","), MAX_JOB_TYPE),
                 parseDate(text(n.get("datePosted"))),
                 decode(text(n.get("description"))));
@@ -152,10 +152,49 @@ public final class JsonLdJobPostingParser {
         return text(n);
     }
 
-    private static String locations(JsonNode n) {
+    private static String location(JsonNode n) {
         List<String> parts = new ArrayList<>();
-        collectLocations(n, parts);
+        List<String> requirements = new ArrayList<>();
+        collectRequirements(n.get("applicantLocationRequirements"), requirements);
+        if (isTelecommute(n.get("jobLocationType")) && requirements.isEmpty()) {
+            parts.add("Remote");
+        }
+        for (String r : requirements) {
+            parts.add("Remote (" + r + ")");
+        }
+        collectLocations(n.get("jobLocation"), parts);
         return parts.isEmpty() ? null : String.join("; ", parts);
+    }
+
+    private static boolean isTelecommute(JsonNode n) {
+        if (n == null) {
+            return false;
+        }
+        if (n.isArray()) {
+            for (JsonNode c : n) {
+                if (isTelecommute(c)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return n.isString() && n.asString().strip().equalsIgnoreCase("TELECOMMUTE");
+    }
+
+    private static void collectRequirements(JsonNode n, List<String> out) {
+        if (n == null || n.isNull()) {
+            return;
+        }
+        if (n.isArray()) {
+            for (JsonNode c : n) {
+                collectRequirements(c, out);
+            }
+            return;
+        }
+        String v = decode(n.isObject() ? text(n.get("name")) : text(n));
+        if (v != null) {
+            out.add(v);
+        }
     }
 
     private static void collectLocations(JsonNode n, List<String> out) {

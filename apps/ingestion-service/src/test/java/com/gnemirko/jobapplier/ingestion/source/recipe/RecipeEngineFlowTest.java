@@ -417,4 +417,27 @@ class RecipeEngineFlowTest {
 
         assertThat(registry.all().stream().map(src -> src.name()).toList()).containsExactly("remotive", "on-recipe");
     }
+
+    @Test
+    void sharedJsonLdIdentifierStoresOneJobAndCountsTheOtherSkipped() {
+        ok("/jobs?page=1", listing("/jobs/a-1", "/jobs/b-2"));
+        ok("/jobs/a-1", detail("SAME", "Job A"));
+        ok("/jobs/b-2", detail("SAME", "Job B"));
+        IngestionRunEntity r = runner.runSource(source(1, 200));
+
+        assertThat(jobs.count()).isEqualTo(1);
+        assertThat(r.getInserted()).isEqualTo(1);
+        assertThat(r.getSkipped()).isEqualTo(1);
+    }
+
+    @Test
+    void urlRegexIdKeepsPagesThatShareAJsonLdIdentifier() {
+        ok("/jobs?page=1", listing("/jobs/a-1", "/jobs/b-2"));
+        ok("/jobs/a-1", detail("SAME", "Job A"));
+        ok("/jobs/b-2", detail("SAME", "Job B"));
+        IngestionRunEntity r = runner.runSource(source(1, 200, "urlRegex:-([0-9]+)$", Clock.systemUTC()));
+
+        assertThat(jobs.count()).isEqualTo(2);
+        assertThat(r.getSkipped()).isZero();
+    }
 }

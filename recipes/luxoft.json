@@ -11,7 +11,7 @@
   },
   "detail": {
     "extractor": "json-ld",
-    "idFrom": "jsonld"
+    "idFrom": "urlRegex:-([0-9]+)$"
   },
   "limits": {
     "maxDetailFetchesPerRun": 200
