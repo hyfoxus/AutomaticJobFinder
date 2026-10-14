@@ -6,7 +6,7 @@ plugins {
 description = 'Fetches, stores and dedupes vacancies'
 
 dependencies {
-    implementation project(':contracts')
+    implementation project(':apps:contracts')
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

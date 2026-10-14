@@ -1,4 +1,4 @@
 rootProject.name = 'JobApplier'
 
-include 'contracts'
-include 'services:ingestion-service'
+include 'apps:contracts'
+include 'apps:ingestion-service'

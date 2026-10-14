@@ -1,0 +1,49 @@
+networks:
+  monorepo-net:
+    driver: bridge
+
+services:
+  job-applier-db:
+    image: postgres:17
+    container_name: job-applier-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-jobapplier}
+      POSTGRES_USER: ${POSTGRES_USER:-jobapplier}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jobapplier}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jobapplier} -d ${POSTGRES_DB:-jobapplier}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - job-applier-dbdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+    networks:
+      - monorepo-net
+
+  ingestion-service:
+    container_name: job-applier-ingestion
+    build:
+      context: .
+      dockerfile: apps/ingestion-service/Dockerfile
+    image: job-applier-ingestion:dev
+    env_file:
+      - path: ./apps/ingestion-service/.env
+        required: false
+    environment:
+      DB_URL: jdbc:postgresql://job-applier-db:5432/${POSTGRES_DB:-jobapplier}
+      DB_USERNAME: ${POSTGRES_USER:-jobapplier}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-jobapplier}
+      INGESTION_CRON: ${INGESTION_CRON:-0 0 */6 * * *}
+    depends_on:
+      job-applier-db:
+        condition: service_healthy
+    ports:
+      - "${INGESTION_HTTP_PORT:-8081}:8081"
+    restart: unless-stopped
+    networks:
+      - monorepo-net
+
+volumes:
+  job-applier-dbdata:
