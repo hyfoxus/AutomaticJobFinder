@@ -6,7 +6,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
@@ -30,12 +32,18 @@ public class RemotiveJobSource implements JobSource {
     private static final Logger log = LoggerFactory.getLogger(RemotiveJobSource.class);
 
     private final RestClient client;
+    private final String category;
+    private final String search;
     private final AtomicInteger skipped = new AtomicInteger();
 
     public RemotiveJobSource(
             RestClient.Builder builder,
             @Value("${ingestion.remotive.url:https://remotive.com/api/remote-jobs}") String url,
-            @Value("${ingestion.remotive.timeout:15s}") Duration timeout) {
+            @Value("${ingestion.remotive.timeout:15s}") Duration timeout,
+            @Value("${ingestion.remotive.category:software-dev}") String category,
+            @Value("${ingestion.remotive.search:}") String search) {
+        this.category = category;
+        this.search = search;
         HttpClient http = HttpClient.newBuilder().connectTimeout(timeout).build();
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(http);
         factory.setReadTimeout(timeout);
@@ -49,7 +57,20 @@ public class RemotiveJobSource implements JobSource {
 
     @Override
     public List<JobPosting> fetch() {
-        RemotiveJobsResponse response = client.get().retrieve().body(RemotiveJobsResponse.class);
+        // Values go in as URI template variables so braces are not parsed and "+" is encoded.
+        RemotiveJobsResponse response = client.get().uri(uriBuilder -> {
+                    Map<String, String> vars = new HashMap<>();
+                    if (!blank(category)) {
+                        uriBuilder.queryParam("category", "{category}");
+                        vars.put("category", category.strip());
+                    }
+                    if (!blank(search)) {
+                        uriBuilder.queryParam("search", "{search}");
+                        vars.put("search", search.strip());
+                    }
+                    return uriBuilder.build(vars);
+                })
+                .retrieve().body(RemotiveJobsResponse.class);
         List<JobPosting> result = new ArrayList<>();
         int bad = 0;
         if (response != null && response.jobs() != null) {
@@ -79,7 +100,8 @@ public class RemotiveJobSource implements JobSource {
             return null;
         }
         return new JobPosting(String.valueOf(i.id()), NAME, i.title().strip(), i.companyName(),
-                i.location(), i.url().strip(), i.description(), parse(i.publicationDate()));
+                i.location(), i.url().strip(), i.description(), parse(i.publicationDate()),
+                i.category(), i.jobType(), i.salary());
     }
 
     private static Instant parse(String s) {

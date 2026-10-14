@@ -1,0 +1,4 @@
+ALTER TABLE jobs
+    ADD COLUMN category VARCHAR(128),
+    ADD COLUMN job_type VARCHAR(64),
+    ADD COLUMN salary   VARCHAR(256);

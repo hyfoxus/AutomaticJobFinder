@@ -22,6 +22,9 @@ public class JobEntity {
     public static final int MAX_TITLE = 512;
     public static final int MAX_TEXT = 512;
     public static final int MAX_URL = 2048;
+    public static final int MAX_CATEGORY = 128;
+    public static final int MAX_JOB_TYPE = 64;
+    public static final int MAX_SALARY = 256;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,6 +54,15 @@ public class JobEntity {
     @Column(name = "posted_at")
     private Instant postedAt;
 
+    @Column(length = MAX_CATEGORY)
+    private String category;
+
+    @Column(name = "job_type", length = MAX_JOB_TYPE)
+    private String jobType;
+
+    @Column(length = MAX_SALARY)
+    private String salary;
+
     @Column(name = "first_seen_at", nullable = false)
     private Instant firstSeenAt;
 
@@ -75,12 +87,16 @@ public class JobEntity {
         this.url = p.url();
         this.description = p.description();
         this.postedAt = p.postedAt();
+        this.category = p.category();
+        this.jobType = p.jobType();
+        this.salary = p.salary();
         this.lastSeenAt = seenAt;
     }
 
     public JobRecord toRecord() {
         return new JobRecord(
-                new JobPosting(externalId, source, title, company, location, url, description, postedAt),
+                new JobPosting(externalId, source, title, company, location, url, description, postedAt,
+                        category, jobType, salary),
                 firstSeenAt);
     }
 

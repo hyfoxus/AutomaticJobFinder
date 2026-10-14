@@ -15,6 +15,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -40,12 +41,14 @@ class IngestionFlowTest {
 
     private static volatile int httpStatus = 200;
     private static volatile String body = "{}";
+    private static volatile String lastQuery;
     private static final HttpServer SERVER = startServer();
 
     private static HttpServer startServer() {
         try {
             HttpServer s = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             s.createContext("/", ex -> {
+                lastQuery = ex.getRequestURI().getRawQuery();
                 byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
                 ex.getResponseHeaders().add("Content-Type", "application/json");
                 ex.sendResponseHeaders(httpStatus, bytes.length);
@@ -81,6 +84,7 @@ class IngestionFlowTest {
         jobs.deleteAll();
         runs.deleteAll();
         httpStatus = 200;
+        lastQuery = null;
     }
 
     private static String fixture(String name) throws IOException {
@@ -183,6 +187,70 @@ class IngestionFlowTest {
         mvc.perform(get("/api/jobs").param("since", max.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private static String stubUrl() {
+        return "http://127.0.0.1:" + SERVER.getAddress().getPort() + "/api";
+    }
+
+    @Test
+    void defaultRequestCarriesCategoryOnly() throws Exception {
+        body = fixture("remotive-3.json");
+        run();
+
+        assertThat(lastQuery).isEqualTo("category=software-dev");
+    }
+
+    @Test
+    void searchIsSentAlongsideCategory() throws Exception {
+        body = fixture("remotive-3.json");
+        new RemotiveJobSource(RestClient.builder(), stubUrl(), java.time.Duration.ofSeconds(3),
+                "software-dev", "java").fetch();
+
+        assertThat(lastQuery).contains("category=software-dev").contains("search=java");
+    }
+
+    @Test
+    void specialCharactersInSearchAreEncodedNotParsedAsTemplates() throws Exception {
+        body = fixture("remotive-3.json");
+        new RemotiveJobSource(RestClient.builder(), stubUrl(), java.time.Duration.ofSeconds(3),
+                "software-dev", "c++ {x}").fetch();
+
+        assertThat(lastQuery).contains("search=c%2B%2B%20%7Bx%7D");
+    }
+
+    @Test
+    void blankSettingsSendNoQuery() throws Exception {
+        body = fixture("remotive-3.json");
+        new RemotiveJobSource(RestClient.builder(), stubUrl(), java.time.Duration.ofSeconds(3), "", " ").fetch();
+
+        assertThat(lastQuery).isNull();
+    }
+
+    @Test
+    void extraFieldsAreStoredAndReturnedOrNull() throws Exception {
+        body = fixture("remotive-3.json");
+        run();
+
+        mvc.perform(get("/api/jobs").param("since", "1970-01-01T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].posting.category").value("Software Development"))
+                .andExpect(jsonPath("$[0].posting.jobType").value("full_time"))
+                .andExpect(jsonPath("$[0].posting.salary").value("$100k - $120k"))
+                .andExpect(jsonPath("$[2].posting.category").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$[2].posting.jobType").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$[2].posting.salary").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void overLongSalaryIsSkippedWithoutFailingTheBatch() throws Exception {
+        body = fixture("remotive-3.json").replace("$100k - $120k", "9".repeat(300));
+        IngestionRunEntity r = run();
+
+        assertThat(r.getStatus()).isEqualTo(Status.SUCCESS);
+        assertThat(jobs.count()).isEqualTo(2);
+        assertThat(jobs.findBySourceAndExternalId("remotive", "1")).isEmpty();
+        assertThat(r.getSkipped()).isEqualTo(2);
     }
 
     @Test

@@ -110,7 +110,10 @@ public class IngestionService {
                 && present(p.url(), JobEntity.MAX_URL)
                 && p.source() != null && p.source().length() <= JobEntity.MAX_SOURCE
                 && within(p.company(), JobEntity.MAX_TEXT)
-                && within(p.location(), JobEntity.MAX_TEXT);
+                && within(p.location(), JobEntity.MAX_TEXT)
+                && within(p.category(), JobEntity.MAX_CATEGORY)
+                && within(p.jobType(), JobEntity.MAX_JOB_TYPE)
+                && within(p.salary(), JobEntity.MAX_SALARY);
     }
 
     private static boolean present(String s, int max) {

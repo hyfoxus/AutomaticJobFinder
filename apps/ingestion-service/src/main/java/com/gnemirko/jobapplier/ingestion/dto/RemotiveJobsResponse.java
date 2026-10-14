@@ -16,6 +16,9 @@ public record RemotiveJobsResponse(List<Item> jobs) {
             @JsonProperty("company_name") String companyName,
             @JsonProperty("candidate_required_location") String location,
             @JsonProperty("publication_date") String publicationDate,
-            String description) {
+            String description,
+            String category,
+            @JsonProperty("job_type") String jobType,
+            String salary) {
     }
 }

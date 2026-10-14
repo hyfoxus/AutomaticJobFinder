@@ -10,7 +10,7 @@
       "job_type": "full_time",
       "publication_date": "2026-10-01T10:00:00",
       "candidate_required_location": "Europe",
-      "salary": "",
+      "salary": "$100k - $120k",
       "description": "<p>Job 1</p>"
     },
     {
@@ -30,11 +30,8 @@
       "url": "https://remotive.com/remote-jobs/software-dev/job-3",
       "title": "Java Developer 3",
       "company_name": "Company 3",
-      "category": "Software Development",
-      "job_type": "full_time",
       "publication_date": "2026-10-03T10:00:00",
       "candidate_required_location": "Europe",
-      "salary": "",
       "description": "<p>Job 3</p>"
     },
     {
