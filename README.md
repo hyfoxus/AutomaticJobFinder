@@ -21,6 +21,8 @@ JobApplier/                       Monorepo root
 │  ├─ contracts/                  Shared DTOs, no logic
 │  └─ ingestion-service/          Fetches, stores and dedupes vacancies
 │     ├─ src/                     Java sources, migrations and tests
+│     │  └─ …/ingestion/          controller, service, repository, entity,
+│     │                           dto, config, source (external integrations)
 │     ├─ docker/entrypoint.sh     Secret loader used inside the runtime image
 │     ├─ Dockerfile               Multi-stage build (context = repo root)
 │     └─ .env.sample              Template for service environment variables

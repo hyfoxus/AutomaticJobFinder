@@ -1,4 +1,4 @@
-package com.gnemirko.jobapplier.ingestion.run;
+package com.gnemirko.jobapplier.ingestion.service;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -10,22 +10,22 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.gnemirko.jobapplier.contracts.JobPosting;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
-import com.gnemirko.jobapplier.ingestion.store.IngestionRunEntity;
-import com.gnemirko.jobapplier.ingestion.store.IngestionRunEntity.Status;
-import com.gnemirko.jobapplier.ingestion.store.IngestionRunRepository;
-import com.gnemirko.jobapplier.ingestion.store.JobEntity;
-import com.gnemirko.jobapplier.ingestion.store.JobRepository;
+import com.gnemirko.jobapplier.ingestion.entity.IngestionRunEntity;
+import com.gnemirko.jobapplier.ingestion.entity.IngestionRunEntity.Status;
+import com.gnemirko.jobapplier.ingestion.repository.IngestionRunRepository;
+import com.gnemirko.jobapplier.ingestion.entity.JobEntity;
+import com.gnemirko.jobapplier.ingestion.repository.JobRepository;
 
-@Component
-public class IngestionRunner {
+@Service
+public class IngestionService {
 
-    private static final Logger log = LoggerFactory.getLogger(IngestionRunner.class);
+    private static final Logger log = LoggerFactory.getLogger(IngestionService.class);
 
     private final List<JobSource> sources;
     private final JobRepository jobs;
@@ -33,7 +33,7 @@ public class IngestionRunner {
     private final TransactionTemplate tx;
     private final Clock clock;
 
-    public IngestionRunner(List<JobSource> sources, JobRepository jobs, IngestionRunRepository runs,
+    public IngestionService(List<JobSource> sources, JobRepository jobs, IngestionRunRepository runs,
             PlatformTransactionManager txManager, Clock clock) {
         this.sources = sources;
         this.jobs = jobs;

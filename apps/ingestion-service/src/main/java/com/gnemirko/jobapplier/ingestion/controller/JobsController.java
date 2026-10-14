@@ -1,4 +1,4 @@
-package com.gnemirko.jobapplier.ingestion.api;
+package com.gnemirko.jobapplier.ingestion.controller;
 
 import java.time.Instant;
 import java.util.List;
@@ -9,22 +9,21 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gnemirko.jobapplier.contracts.JobRecord;
-import com.gnemirko.jobapplier.ingestion.store.JobEntity;
-import com.gnemirko.jobapplier.ingestion.store.JobRepository;
+import com.gnemirko.jobapplier.ingestion.service.JobQueryService;
 
 @RestController
 @RequestMapping("/api/jobs")
 public class JobsController {
 
-    private final JobRepository jobs;
+    private final JobQueryService jobs;
 
-    public JobsController(JobRepository jobs) {
+    public JobsController(JobQueryService jobs) {
         this.jobs = jobs;
     }
 
     /** Jobs first seen strictly after {@code since} (default: epoch), oldest first. */
     @GetMapping
     public List<JobRecord> since(@RequestParam(defaultValue = "1970-01-01T00:00:00Z") Instant since) {
-        return jobs.findFirstSeenAfter(since).stream().map(JobEntity::toRecord).toList();
+        return jobs.since(since);
     }
 }

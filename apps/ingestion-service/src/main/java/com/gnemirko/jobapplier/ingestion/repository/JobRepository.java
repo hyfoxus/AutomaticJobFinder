@@ -1,4 +1,4 @@
-package com.gnemirko.jobapplier.ingestion.store;
+package com.gnemirko.jobapplier.ingestion.repository;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -8,6 +8,8 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import com.gnemirko.jobapplier.ingestion.entity.JobEntity;
 
 public interface JobRepository extends JpaRepository<JobEntity, Long> {
 

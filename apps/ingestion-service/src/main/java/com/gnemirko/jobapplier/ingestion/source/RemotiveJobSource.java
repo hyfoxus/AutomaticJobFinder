@@ -16,9 +16,8 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.gnemirko.jobapplier.contracts.JobPosting;
+import com.gnemirko.jobapplier.ingestion.dto.RemotiveJobsResponse;
 
 /**
  * Remotive public API. Terms: at most about 4 fetches a day; keep source and url
@@ -50,11 +49,11 @@ public class RemotiveJobSource implements JobSource {
 
     @Override
     public List<JobPosting> fetch() {
-        Response response = client.get().retrieve().body(Response.class);
+        RemotiveJobsResponse response = client.get().retrieve().body(RemotiveJobsResponse.class);
         List<JobPosting> result = new ArrayList<>();
         int bad = 0;
         if (response != null && response.jobs() != null) {
-            for (Item item : response.jobs()) {
+            for (RemotiveJobsResponse.Item item : response.jobs()) {
                 JobPosting posting = map(item);
                 if (posting == null) {
                     bad++;
@@ -75,7 +74,7 @@ public class RemotiveJobSource implements JobSource {
         return skipped.get();
     }
 
-    private JobPosting map(Item i) {
+    private JobPosting map(RemotiveJobsResponse.Item i) {
         if (i == null || i.id() == null || blank(i.title()) || blank(i.url())) {
             return null;
         }
@@ -96,20 +95,5 @@ public class RemotiveJobSource implements JobSource {
 
     private static boolean blank(String s) {
         return s == null || s.isBlank();
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    record Response(List<Item> jobs) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    record Item(
-            Long id,
-            String url,
-            String title,
-            @JsonProperty("company_name") String companyName,
-            @JsonProperty("candidate_required_location") String location,
-            @JsonProperty("publication_date") String publicationDate,
-            String description) {
     }
 }

@@ -1,4 +1,4 @@
-package com.gnemirko.jobapplier.ingestion.store;
+package com.gnemirko.jobapplier.ingestion.entity;
 
 import java.time.Instant;
 

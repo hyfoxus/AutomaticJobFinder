@@ -23,13 +23,13 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.gnemirko.jobapplier.ingestion.run.IngestionRunner;
+import com.gnemirko.jobapplier.ingestion.service.IngestionService;
 import com.gnemirko.jobapplier.ingestion.source.RemotiveJobSource;
-import com.gnemirko.jobapplier.ingestion.store.IngestionRunEntity;
-import com.gnemirko.jobapplier.ingestion.store.IngestionRunEntity.Status;
-import com.gnemirko.jobapplier.ingestion.store.IngestionRunRepository;
-import com.gnemirko.jobapplier.ingestion.store.JobEntity;
-import com.gnemirko.jobapplier.ingestion.store.JobRepository;
+import com.gnemirko.jobapplier.ingestion.entity.IngestionRunEntity;
+import com.gnemirko.jobapplier.ingestion.entity.IngestionRunEntity.Status;
+import com.gnemirko.jobapplier.ingestion.repository.IngestionRunRepository;
+import com.gnemirko.jobapplier.ingestion.entity.JobEntity;
+import com.gnemirko.jobapplier.ingestion.repository.JobRepository;
 import com.sun.net.httpserver.HttpServer;
 
 /** Real Postgres (Testcontainers) and a local HTTP server replaying recorded Remotive fixtures. */
@@ -70,7 +70,7 @@ class IngestionFlowTest {
         SERVER.stop(0);
     }
 
-    @Autowired IngestionRunner runner;
+    @Autowired IngestionService runner;
     @Autowired RemotiveJobSource source;
     @Autowired JobRepository jobs;
     @Autowired IngestionRunRepository runs;
