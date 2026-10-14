@@ -1,0 +1,19 @@
+{
+  "name": "luxoft",
+  "enabled": false,
+  "strategy": "paginated-listing",
+  "listing": {
+    "urlTemplate": "https://career.luxoft.com/jobs?page={page}",
+    "firstPage": 1,
+    "maxPages": 80,
+    "linkSelector": "a[href]",
+    "linkPattern": "^https://career\\.luxoft\\.com/jobs/[a-z0-9-]+-[0-9]+$"
+  },
+  "detail": {
+    "extractor": "json-ld",
+    "idFrom": "jsonld"
+  },
+  "limits": {
+    "maxDetailFetchesPerRun": 200
+  }
+}

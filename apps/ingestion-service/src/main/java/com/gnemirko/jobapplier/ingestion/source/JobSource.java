@@ -1,19 +1,17 @@
 package com.gnemirko.jobapplier.ingestion.source;
 
-import java.util.List;
-
-import com.gnemirko.jobapplier.contracts.JobPosting;
+import com.gnemirko.jobapplier.ingestion.dto.FetchContext;
+import com.gnemirko.jobapplier.ingestion.dto.FetchResult;
 
 public interface JobSource {
 
     /** Stable source name, stored with every job. */
     String name();
 
-    /** Fetches current postings. Throws on transport failure. Malformed items are dropped. */
-    List<JobPosting> fetch();
+    /** Fetches current postings. Throws on transport failure. Malformed items are dropped and counted. */
+    FetchResult fetch(FetchContext context);
 
-    /** Number of malformed items dropped by the most recent {@link #fetch()}. */
-    default int skippedInLastFetch() {
-        return 0;
+    default FetchResult fetch() {
+        return fetch(FetchContext.EMPTY);
     }
 }

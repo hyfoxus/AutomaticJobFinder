@@ -1,7 +1,9 @@
 package com.gnemirko.jobapplier.ingestion.service;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,5 +25,11 @@ public class JobQueryService {
     @Transactional(readOnly = true)
     public List<JobRecord> since(Instant since) {
         return jobs.findFirstSeenAfter(since).stream().map(JobEntity::toRecord).toList();
+    }
+
+    /** Canonical urls already stored for a source. Note: this is a per-source scan of the jobs table. */
+    @Transactional(readOnly = true)
+    public Set<String> knownUrls(String source) {
+        return new HashSet<>(jobs.findUrlsBySource(source));
     }
 }

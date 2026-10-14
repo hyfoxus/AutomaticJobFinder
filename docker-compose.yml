@@ -38,6 +38,10 @@ services:
       INGESTION_CRON: ${INGESTION_CRON:-0 0 */6 * * *}
       INGESTION_REMOTIVE_CATEGORY: ${INGESTION_REMOTIVE_CATEGORY-software-dev}
       INGESTION_REMOTIVE_SEARCH: ${INGESTION_REMOTIVE_SEARCH-}
+      INGESTION_RECIPES_DIR: ${INGESTION_RECIPES_DIR:-/app/recipes}
+      INGESTION_FETCH_MAX_RUN_DURATION: ${INGESTION_FETCH_MAX_RUN_DURATION:-20m}
+    volumes:
+      - ./recipes:/app/recipes:ro
     depends_on:
       job-applier-db:
         condition: service_healthy

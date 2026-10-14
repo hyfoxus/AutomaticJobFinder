@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +18,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import com.gnemirko.jobapplier.contracts.JobPosting;
+import com.gnemirko.jobapplier.ingestion.dto.FetchContext;
+import com.gnemirko.jobapplier.ingestion.dto.FetchResult;
 import com.gnemirko.jobapplier.ingestion.dto.RemotiveJobsResponse;
 
 /**
@@ -34,7 +35,6 @@ public class RemotiveJobSource implements JobSource {
     private final RestClient client;
     private final String category;
     private final String search;
-    private final AtomicInteger skipped = new AtomicInteger();
 
     public RemotiveJobSource(
             RestClient.Builder builder,
@@ -56,7 +56,7 @@ public class RemotiveJobSource implements JobSource {
     }
 
     @Override
-    public List<JobPosting> fetch() {
+    public FetchResult fetch(FetchContext context) {
         // Values go in as URI template variables so braces are not parsed and "+" is encoded.
         RemotiveJobsResponse response = client.get().uri(uriBuilder -> {
                     Map<String, String> vars = new HashMap<>();
@@ -83,16 +83,10 @@ public class RemotiveJobSource implements JobSource {
                 }
             }
         }
-        skipped.set(bad);
         if (bad > 0) {
             log.warn("Remotive: skipped {} malformed item(s)", bad);
         }
-        return result;
-    }
-
-    @Override
-    public int skippedInLastFetch() {
-        return skipped.get();
+        return FetchResult.of(result, bad);
     }
 
     private JobPosting map(RemotiveJobsResponse.Item i) {

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.gnemirko.jobapplier.contracts.JobPosting;
+import com.gnemirko.jobapplier.ingestion.dto.FetchContext;
+import com.gnemirko.jobapplier.ingestion.dto.FetchResult;
+import com.gnemirko.jobapplier.ingestion.exception.FetchBlockedException;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
 import com.gnemirko.jobapplier.ingestion.entity.IngestionRunEntity;
 import com.gnemirko.jobapplier.ingestion.entity.IngestionRunEntity.Status;
@@ -27,15 +31,19 @@ public class IngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(IngestionService.class);
 
-    private final List<JobSource> sources;
+    private static final int TOUCH_CHUNK = 1000;
+
+    private final SourceRegistry sources;
+    private final JobQueryService queries;
     private final JobRepository jobs;
     private final IngestionRunRepository runs;
     private final TransactionTemplate tx;
     private final Clock clock;
 
-    public IngestionService(List<JobSource> sources, JobRepository jobs, IngestionRunRepository runs,
+    public IngestionService(SourceRegistry sources, JobQueryService queries, JobRepository jobs, IngestionRunRepository runs,
             PlatformTransactionManager txManager, Clock clock) {
         this.sources = sources;
+        this.queries = queries;
         this.jobs = jobs;
         this.runs = runs;
         this.tx = new TransactionTemplate(txManager);
@@ -44,7 +52,7 @@ public class IngestionService {
 
     @Scheduled(cron = "${ingestion.cron:0 0 */6 * * *}")
     public void runAll() {
-        for (JobSource source : sources) {
+        for (JobSource source : sources.all()) {
             runSource(source);
         }
     }
@@ -53,9 +61,13 @@ public class IngestionService {
     public IngestionRunEntity runSource(JobSource source) {
         Instant started = clock.instant();
         try {
-            List<JobPosting> fetched = source.fetch();
-            int malformed = source.skippedInLastFetch();
-            return tx.execute(status -> store(source.name(), started, fetched, malformed));
+            FetchContext context = new FetchContext(queries.knownUrls(source.name()));
+            FetchResult result = source.fetch(context);
+            return tx.execute(status -> store(source.name(), started, result));
+        } catch (FetchBlockedException e) {
+            log.error("Ingestion of '{}' blocked: {}", source.name(), e.getMessage());
+            return runs.save(new IngestionRunEntity(source.name(), started, clock.instant(), Status.FAILED,
+                    0, 0, 0, 0, "blocked"));
         } catch (RuntimeException e) {
             log.error("Ingestion of '{}' failed", source.name(), e);
             return runs.save(new IngestionRunEntity(source.name(), started, clock.instant(), Status.FAILED,
@@ -63,10 +75,11 @@ public class IngestionService {
         }
     }
 
-    private IngestionRunEntity store(String sourceName, Instant started, List<JobPosting> fetched, int malformed) {
+    private IngestionRunEntity store(String sourceName, Instant started, FetchResult result) {
+        List<JobPosting> fetched = result.postings();
         // Taken inside the transaction so firstSeenAt reflects store time, not run start.
         Instant now = clock.instant();
-        int skipped = malformed;
+        int skipped = result.skipped();
         Map<String, JobPosting> valid = new LinkedHashMap<>();
         for (JobPosting p : fetched) {
             if (!fits(p)) {
@@ -96,11 +109,21 @@ public class IngestionService {
             }
         }
         jobs.saveAll(toSave);
+        updated += touch(sourceName, result.unchangedUrls(), now);
         IngestionRunEntity run = runs.save(new IngestionRunEntity(sourceName, started, now, Status.SUCCESS,
-                fetched.size(), inserted, updated, skipped, null));
+                fetched.size() + result.unchangedUrls().size(), inserted, updated, skipped, result.note()));
         log.info("Ingestion of '{}': fetched={} new={} seen={} skipped={}",
                 sourceName, fetched.size(), inserted, updated, skipped);
         return run;
+    }
+
+    private int touch(String sourceName, Set<String> urls, Instant now) {
+        int touched = 0;
+        List<String> all = new ArrayList<>(urls);
+        for (int i = 0; i < all.size(); i += TOUCH_CHUNK) {
+            touched += jobs.touchLastSeen(sourceName, all.subList(i, Math.min(all.size(), i + TOUCH_CHUNK)), now);
+        }
+        return touched;
     }
 
     private static boolean fits(JobPosting p) {
