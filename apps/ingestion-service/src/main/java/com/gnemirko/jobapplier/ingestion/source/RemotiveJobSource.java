@@ -95,7 +95,7 @@ public class RemotiveJobSource implements JobSource {
         }
         return new JobPosting(String.valueOf(i.id()), NAME, i.title().strip(), i.companyName(),
                 i.location(), i.url().strip(), i.description(), parse(i.publicationDate()),
-                i.category(), i.jobType(), i.salary());
+                i.category(), i.jobType(), i.salary(), null);
     }
 
     private static Instant parse(String s) {

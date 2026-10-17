@@ -1,0 +1,32 @@
+{
+  "name": "epam",
+  "enabled": false,
+  "strategy": "sitemap",
+  "sitemap": {
+    "url": "https://careers.epam.com/sitemap.xml.gz",
+    "urlPattern": "^https://careers\\.epam\\.com/en/vacancy/[^?#]*java",
+    "maxUrls": 600
+  },
+  "detail": {
+    "extractor": "embedded-json",
+    "embeddedJson": {
+      "selector": "script#__NEXT_DATA__",
+      "fields": {
+        "id": "props.pageProps.job.unique_id",
+        "title": "props.pageProps.job.name",
+        "location": {"join": ["props.pageProps.job.city", "props.pageProps.job.country[*]"], "sep": ", "},
+        "jobType": "props.pageProps.job.vacancy_type",
+        "category": "props.pageProps.job.job_specialization[*]",
+        "description": "props.pageProps.job.description",
+        "postedAt": "props.pageProps.job.created_at"
+      },
+      "constants": {
+        "company": "EPAM Systems"
+      },
+      "expiredPath": "props.pageProps.job.is_expired"
+    }
+  },
+  "limits": {
+    "maxDetailFetchesPerRun": 300
+  }
+}

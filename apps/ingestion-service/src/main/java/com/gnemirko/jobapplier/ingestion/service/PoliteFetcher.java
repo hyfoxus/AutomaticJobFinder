@@ -46,6 +46,15 @@ public class PoliteFetcher {
     }
 
     public FetchedPage fetch(URI uri) {
+        return fetch(uri, props.maxBodyBytes());
+    }
+
+    /** Size cap for sitemap downloads, which are larger than pages. */
+    public long maxSitemapBytes() {
+        return props.maxSitemapBytes();
+    }
+
+    public FetchedPage fetch(URI uri, long maxBodyBytes) {
         policy.validate(uri);
         RobotsService.Rules rules = robots.rulesFor(uri);
         if (!rules.isAllowed(uri)) {
@@ -67,7 +76,7 @@ public class PoliteFetcher {
                 }
             }
             pacer.pace(key, delay, deadline);
-            HttpExchange.Reply reply = exchange.get(current, props.maxBodyBytes(), true, deadline);
+            HttpExchange.Reply reply = exchange.get(current, maxBodyBytes, true, deadline);
             if (reply.isBlocked()) {
                 throw new FetchBlockedException("Host refused automated access (status " + reply.status() + ")");
             }

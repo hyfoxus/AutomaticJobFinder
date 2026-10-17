@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import com.gnemirko.jobapplier.ingestion.dto.Recipe;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
 import com.gnemirko.jobapplier.ingestion.source.recipe.RecipeJobSource;
+import com.gnemirko.jobapplier.ingestion.source.recipe.SitemapReader;
+import com.gnemirko.jobapplier.ingestion.source.recipe.SitemapRecipeJobSource;
 
 /** Every source the runner executes: built-ins first (Remotive), then one per enabled recipe. */
 @Service
@@ -23,7 +25,12 @@ public class SourceRegistry {
         List<JobSource> all = new ArrayList<>(builtIns);
         for (Recipe recipe : recipes.recipes()) {
             if (recipe.isEnabled()) {
-                all.add(new RecipeJobSource(recipe, fetcher, clock, maxRunDuration));
+                if (Recipe.STRATEGY_SITEMAP.equals(recipe.strategy())) {
+                    all.add(new SitemapRecipeJobSource(recipe, fetcher, new SitemapReader(fetcher), clock,
+                            maxRunDuration));
+                } else {
+                    all.add(new RecipeJobSource(recipe, fetcher, clock, maxRunDuration));
+                }
             }
         }
         this.sources = List.copyOf(all);

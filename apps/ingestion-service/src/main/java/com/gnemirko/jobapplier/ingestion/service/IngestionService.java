@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,7 +62,7 @@ public class IngestionService {
     public IngestionRunEntity runSource(JobSource source) {
         Instant started = clock.instant();
         try {
-            FetchContext context = new FetchContext(queries.knownUrls(source.name()));
+            FetchContext context = new FetchContext(queries.knownJobs(source.name()));
             FetchResult result = source.fetch(context);
             return tx.execute(status -> store(source.name(), started, result));
         } catch (FetchBlockedException e) {
@@ -112,9 +113,14 @@ public class IngestionService {
             }
         }
         jobs.saveAll(toSave);
-        updated += touch(sourceName, result.unchangedUrls(), now);
+        // A job that was just re-read is already counted and refreshed; only touch the rest.
+        Set<String> toTouch = new LinkedHashSet<>(result.unchangedUrls());
+        for (JobPosting p : valid.values()) {
+            toTouch.remove(p.url());
+        }
+        updated += touch(sourceName, toTouch, now);
         IngestionRunEntity run = runs.save(new IngestionRunEntity(sourceName, started, now, Status.SUCCESS,
-                fetched.size() + result.unchangedUrls().size(), inserted, updated, skipped, result.note()));
+                fetched.size() + toTouch.size(), inserted, updated, skipped, result.note()));
         log.info("Ingestion of '{}': fetched={} new={} seen={} skipped={}",
                 sourceName, fetched.size(), inserted, updated, skipped);
         return run;

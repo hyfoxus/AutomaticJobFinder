@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import com.gnemirko.jobapplier.ingestion.dto.Recipe;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
+import com.gnemirko.jobapplier.ingestion.source.recipe.EmbeddedJsonParser;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -97,14 +98,39 @@ public class RecipeRegistry {
         if (r.name() == null || !NAME.matcher(r.name()).matches()) {
             throw new IllegalArgumentException("name must match [a-z0-9-]{1,64}");
         }
-        if (!Recipe.STRATEGY_PAGINATED_LISTING.equals(r.strategy())) {
+        Recipe.Listing l = r.listing();
+        Recipe.Sitemap sm = r.sitemap();
+        Recipe.Detail d = r.detail();
+        if (Recipe.STRATEGY_PAGINATED_LISTING.equals(r.strategy())) {
+            if (sm != null) {
+                throw new IllegalArgumentException("sitemap block does not belong to strategy paginated-listing");
+            }
+            if (l == null) {
+                throw new IllegalArgumentException("listing is required");
+            }
+            validateListing(l);
+        } else if (Recipe.STRATEGY_SITEMAP.equals(r.strategy())) {
+            if (l != null) {
+                throw new IllegalArgumentException("listing block does not belong to strategy sitemap");
+            }
+            if (sm == null) {
+                throw new IllegalArgumentException("sitemap is required");
+            }
+            validateSitemap(sm);
+        } else {
             throw new IllegalArgumentException("unsupported strategy " + r.strategy());
         }
-        Recipe.Listing l = r.listing();
-        Recipe.Detail d = r.detail();
-        if (l == null || d == null) {
-            throw new IllegalArgumentException("listing and detail are required");
+        if (d == null) {
+            throw new IllegalArgumentException("detail is required");
         }
+        validateDetail(d);
+        int cap = r.limits().maxDetailFetchesPerRun();
+        if (cap < 1 || cap > 1000) {
+            throw new IllegalArgumentException("limits.maxDetailFetchesPerRun must be 1..1000");
+        }
+    }
+
+    private static void validateListing(Recipe.Listing l) {
         checkTemplate(l.urlTemplate());
         if (l.firstPage() < 0 || l.firstPage() > 1_000_000) {
             throw new IllegalArgumentException("firstPage out of range");
@@ -124,24 +150,43 @@ public class RecipeRegistry {
             throw new IllegalArgumentException("listing.linkPattern is required");
         }
         checkRegex(l.linkPattern(), "linkPattern");
-        if (!Recipe.EXTRACTOR_JSON_LD.equals(d.extractor())) {
-            throw new IllegalArgumentException("unsupported extractor " + d.extractor());
+    }
+
+    private static void validateSitemap(Recipe.Sitemap sm) {
+        checkHttpsUrl(sm.url(), "sitemap.url");
+        if (sm.urlPattern() == null || sm.urlPattern().isBlank()) {
+            throw new IllegalArgumentException("sitemap.urlPattern is required");
         }
-        String idFrom = d.idFrom();
-        if (idFrom == null) {
-            throw new IllegalArgumentException("detail.idFrom is required");
+        checkRegex(sm.urlPattern(), "urlPattern");
+        if (sm.maxUrls() < 1 || sm.maxUrls() > 5000) {
+            throw new IllegalArgumentException("sitemap.maxUrls must be 1..5000");
         }
-        if (idFrom.startsWith(Recipe.ID_URL_REGEX_PREFIX)) {
-            Pattern p = checkRegex(idFrom.substring(Recipe.ID_URL_REGEX_PREFIX.length()), "idFrom");
-            if (p.matcher("").groupCount() != 1) {
-                throw new IllegalArgumentException("idFrom regex needs exactly one group");
+    }
+
+    private static void validateDetail(Recipe.Detail d) {
+        if (Recipe.EXTRACTOR_JSON_LD.equals(d.extractor())) {
+            if (d.embeddedJson() != null) {
+                throw new IllegalArgumentException("embeddedJson block does not belong to extractor json-ld");
             }
-        } else if (!Recipe.ID_JSONLD.equals(idFrom)) {
-            throw new IllegalArgumentException("idFrom must be 'jsonld' or 'urlRegex:<regex>'");
-        }
-        int cap = r.limits().maxDetailFetchesPerRun();
-        if (cap < 1 || cap > 1000) {
-            throw new IllegalArgumentException("limits.maxDetailFetchesPerRun must be 1..1000");
+            String idFrom = d.idFrom();
+            if (idFrom == null) {
+                throw new IllegalArgumentException("detail.idFrom is required");
+            }
+            if (idFrom.startsWith(Recipe.ID_URL_REGEX_PREFIX)) {
+                Pattern p = checkRegex(idFrom.substring(Recipe.ID_URL_REGEX_PREFIX.length()), "idFrom");
+                if (p.matcher("").groupCount() != 1) {
+                    throw new IllegalArgumentException("idFrom regex needs exactly one group");
+                }
+            } else if (!Recipe.ID_JSONLD.equals(idFrom)) {
+                throw new IllegalArgumentException("idFrom must be 'jsonld' or 'urlRegex:<regex>'");
+            }
+        } else if (Recipe.EXTRACTOR_EMBEDDED_JSON.equals(d.extractor())) {
+            if (d.idFrom() != null) {
+                throw new IllegalArgumentException("idFrom does not belong to extractor embedded-json; map fields.id");
+            }
+            new EmbeddedJsonParser(d.embeddedJson());
+        } else {
+            throw new IllegalArgumentException("unsupported extractor " + d.extractor());
         }
     }
 
@@ -150,14 +195,18 @@ public class RecipeRegistry {
                 || template.indexOf("{page}") != template.lastIndexOf("{page}")) {
             throw new IllegalArgumentException("listing.urlTemplate must contain {page} once");
         }
+        checkHttpsUrl(template.replace("{page}", "1"), "urlTemplate");
+    }
+
+    private static void checkHttpsUrl(String url, String label) {
         URI uri;
         try {
-            uri = URI.create(template.replace("{page}", "1"));
+            uri = URI.create(url == null ? "" : url);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("urlTemplate is not a valid URL");
+            throw new IllegalArgumentException(label + " is not a valid URL");
         }
         if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getRawUserInfo() != null) {
-            throw new IllegalArgumentException("urlTemplate must be an https URL with a host and no credentials");
+            throw new IllegalArgumentException(label + " must be an https URL with a host and no credentials");
         }
     }
 

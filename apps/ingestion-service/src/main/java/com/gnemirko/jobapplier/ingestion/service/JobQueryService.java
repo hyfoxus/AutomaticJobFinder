@@ -1,9 +1,9 @@
 package com.gnemirko.jobapplier.ingestion.service;
 
 import java.time.Instant;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,9 +27,22 @@ public class JobQueryService {
         return jobs.findFirstSeenAfter(since).stream().map(JobEntity::toRecord).toList();
     }
 
-    /** Canonical urls already stored for a source. Note: this is a per-source scan of the jobs table. */
+    /**
+     * Canonical url to stored source marker (possibly null) for a source. Note: this is a per-source
+     * scan of the jobs table. A url stored more than once maps to null so it is always refetched.
+     */
     @Transactional(readOnly = true)
-    public Set<String> knownUrls(String source) {
-        return new HashSet<>(jobs.findUrlsBySource(source));
+    public Map<String, Instant> knownJobs(String source) {
+        Map<String, Instant> result = new HashMap<>();
+        for (Object[] row : jobs.findUrlMarkersBySource(source)) {
+            String url = (String) row[0];
+            Instant marker = (Instant) row[1];
+            if (result.containsKey(url)) {
+                result.put(url, null);
+            } else {
+                result.put(url, marker);
+            }
+        }
+        return result;
     }
 }

@@ -21,8 +21,9 @@ public interface JobRepository extends JpaRepository<JobEntity, Long> {
     @Query("select j from JobEntity j where j.firstSeenAt > :since order by j.firstSeenAt asc, j.id asc")
     List<JobEntity> findFirstSeenAfter(@Param("since") Instant since);
 
-    @Query("select j.url from JobEntity j where j.source = :source")
-    List<String> findUrlsBySource(@Param("source") String source);
+    /** Rows of (url, sourceUpdatedAt) for a source; the marker may be null. */
+    @Query("select j.url, j.sourceUpdatedAt from JobEntity j where j.source = :source")
+    List<Object[]> findUrlMarkersBySource(@Param("source") String source);
 
     /** Bumps lastSeenAt for stored jobs of a source by canonical url; returns rows changed. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

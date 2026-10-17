@@ -63,6 +63,9 @@ public class JobEntity {
     @Column(length = MAX_SALARY)
     private String salary;
 
+    @Column(name = "source_updated_at")
+    private Instant sourceUpdatedAt;
+
     @Column(name = "first_seen_at", nullable = false)
     private Instant firstSeenAt;
 
@@ -90,13 +93,14 @@ public class JobEntity {
         this.category = p.category();
         this.jobType = p.jobType();
         this.salary = p.salary();
+        this.sourceUpdatedAt = p.updatedAt();
         this.lastSeenAt = seenAt;
     }
 
     public JobRecord toRecord() {
         return new JobRecord(
                 new JobPosting(externalId, source, title, company, location, url, description, postedAt,
-                        category, jobType, salary),
+                        category, jobType, salary, sourceUpdatedAt),
                 firstSeenAt);
     }
 
@@ -114,6 +118,10 @@ public class JobEntity {
 
     public Instant getFirstSeenAt() {
         return firstSeenAt;
+    }
+
+    public Instant getSourceUpdatedAt() {
+        return sourceUpdatedAt;
     }
 
     public Instant getLastSeenAt() {
