@@ -12,8 +12,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "jobs", uniqueConstraints = @UniqueConstraint(columnNames = {"source", "external_id"}))
 public class JobEntity {
 
@@ -28,12 +32,15 @@ public class JobEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(nullable = false, length = MAX_SOURCE)
+    @Getter
     private String source;
 
     @Column(name = "external_id", nullable = false, length = MAX_EXTERNAL_ID)
+    @Getter
     private String externalId;
 
     @Column(nullable = false, length = MAX_TITLE)
@@ -64,16 +71,16 @@ public class JobEntity {
     private String salary;
 
     @Column(name = "source_updated_at")
+    @Getter
     private Instant sourceUpdatedAt;
 
     @Column(name = "first_seen_at", nullable = false)
+    @Getter
     private Instant firstSeenAt;
 
     @Column(name = "last_seen_at", nullable = false)
+    @Getter
     private Instant lastSeenAt;
-
-    protected JobEntity() {
-    }
 
     public JobEntity(JobPosting p, Instant seenAt) {
         this.source = p.source();
@@ -102,29 +109,5 @@ public class JobEntity {
                 new JobPosting(externalId, source, title, company, location, url, description, postedAt,
                         category, jobType, salary, sourceUpdatedAt),
                 firstSeenAt);
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getSource() {
-        return source;
-    }
-
-    public String getExternalId() {
-        return externalId;
-    }
-
-    public Instant getFirstSeenAt() {
-        return firstSeenAt;
-    }
-
-    public Instant getSourceUpdatedAt() {
-        return sourceUpdatedAt;
-    }
-
-    public Instant getLastSeenAt() {
-        return lastSeenAt;
     }
 }

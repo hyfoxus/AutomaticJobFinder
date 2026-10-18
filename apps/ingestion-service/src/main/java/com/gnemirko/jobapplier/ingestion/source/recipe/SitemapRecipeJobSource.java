@@ -13,24 +13,21 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.gnemirko.jobapplier.contracts.JobPosting;
 import com.gnemirko.jobapplier.ingestion.dto.FetchContext;
 import com.gnemirko.jobapplier.ingestion.dto.FetchResult;
 import com.gnemirko.jobapplier.ingestion.dto.Recipe;
 import com.gnemirko.jobapplier.ingestion.service.PoliteFetcher;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * The sitemap strategy: list job URLs from a sitemap, read new pages and pages whose lastmod
  * changed. Every listed URL that is already stored is reported as seen, whatever happens to its
  * page, so it stays alive and is retried on the next run.
  */
+@Slf4j
 public class SitemapRecipeJobSource implements JobSource {
-
-    private static final Logger log = LoggerFactory.getLogger(SitemapRecipeJobSource.class);
 
     private final Recipe recipe;
     private final PoliteFetcher fetcher;

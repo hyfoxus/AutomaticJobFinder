@@ -6,17 +6,15 @@ import java.time.Instant;
 import org.jsoup.nodes.Document;
 
 import com.gnemirko.jobapplier.contracts.JobPosting;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 
 /** The embedded-json extractor: maps a JSON script block onto a posting. */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 final class EmbeddedJsonExtractor implements DetailExtractor {
 
     private final String sourceName;
     private final EmbeddedJsonParser parser;
-
-    EmbeddedJsonExtractor(String sourceName, EmbeddedJsonParser parser) {
-        this.sourceName = sourceName;
-        this.parser = parser;
-    }
 
     @Override
     public Result extract(Document doc, URI link, Instant updatedAt) {

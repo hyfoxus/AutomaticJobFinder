@@ -5,12 +5,15 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import tools.jackson.databind.JsonNode;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 
 /**
  * A tiny path expression over a JSON tree: dotted keys, {@code [n]} and {@code [*]}, for example
  * {@code props.pageProps.job.country[*]}. A missing key, or an index on a non-array, yields
  * nothing; evaluation never throws.
  */
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 final class JsonPath {
 
     static final int MAX_SEGMENTS = 32;
@@ -31,11 +34,6 @@ final class JsonPath {
 
     private final String source;
     private final List<Segment> segments;
-
-    private JsonPath(String source, List<Segment> segments) {
-        this.source = source;
-        this.segments = segments;
-    }
 
     /** Throws IllegalArgumentException for an invalid expression. */
     static JsonPath compile(String expression) {

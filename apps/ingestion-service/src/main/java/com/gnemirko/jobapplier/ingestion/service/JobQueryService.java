@@ -11,15 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 import com.gnemirko.jobapplier.contracts.JobRecord;
 import com.gnemirko.jobapplier.ingestion.entity.JobEntity;
 import com.gnemirko.jobapplier.ingestion.repository.JobRepository;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class JobQueryService {
 
     private final JobRepository jobs;
-
-    public JobQueryService(JobRepository jobs) {
-        this.jobs = jobs;
-    }
 
     /** Jobs first seen strictly after {@code since}, oldest first. */
     @Transactional(readOnly = true)

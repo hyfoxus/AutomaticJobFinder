@@ -10,8 +10,6 @@ import java.util.regex.Pattern;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.gnemirko.jobapplier.contracts.JobPosting;
 import com.gnemirko.jobapplier.ingestion.dto.FetchedPage;
@@ -20,15 +18,19 @@ import com.gnemirko.jobapplier.ingestion.exception.FetchBlockedException;
 import com.gnemirko.jobapplier.ingestion.exception.FetchException;
 import com.gnemirko.jobapplier.ingestion.exception.RobotsDisallowedException;
 import com.gnemirko.jobapplier.ingestion.service.PoliteFetcher;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * One run's worth of detail fetching, shared by both strategies: fetches a link, hands the page to
  * the extractor and keeps the counters. Five consecutive failed fetches abort the run; a blocked
  * response propagates at once.
  */
+@Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 final class DetailStep {
 
-    private static final Logger log = LoggerFactory.getLogger(DetailStep.class);
     static final int MAX_CONSECUTIVE_DETAIL_FAILURES = 5;
     private static final Pattern CHARSET_PARAM = Pattern.compile("charset\\s*=\\s*[\"']?([^;\"'\\s]+)", Pattern.CASE_INSENSITIVE);
 
@@ -43,13 +45,6 @@ final class DetailStep {
     private int failed;
     private int bad;
     private int robotsSkipped;
-
-    DetailStep(PoliteFetcher fetcher, String sourceName, DetailExtractor extractor, int cap) {
-        this.fetcher = fetcher;
-        this.sourceName = sourceName;
-        this.extractor = extractor;
-        this.cap = cap;
-    }
 
     /** The extractor a recipe asks for. */
     static DetailExtractor extractorFor(Recipe recipe, Pattern idPattern) {

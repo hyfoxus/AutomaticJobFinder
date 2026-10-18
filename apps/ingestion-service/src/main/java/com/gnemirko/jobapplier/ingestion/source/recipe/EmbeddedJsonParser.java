@@ -10,19 +10,19 @@ import java.util.Set;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.QueryParser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.gnemirko.jobapplier.ingestion.dto.Recipe;
 import com.gnemirko.jobapplier.ingestion.entity.JobEntity;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Reads one job out of a JSON {@code <script>} block (for example {@code __NEXT_DATA__}) by
  * applying the path expressions of a recipe. Compiling validates the recipe; parsing never throws.
  */
+@Slf4j
 public final class EmbeddedJsonParser {
 
     public enum Kind {
@@ -40,7 +40,6 @@ public final class EmbeddedJsonParser {
     public static final Set<String> FIELD_NAMES = Set.of("id", "title", "company", "location", "jobType",
             "category", "description", "postedAt");
 
-    private static final Logger log = LoggerFactory.getLogger(EmbeddedJsonParser.class);
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final String DEFAULT_SEP = ", ";
 

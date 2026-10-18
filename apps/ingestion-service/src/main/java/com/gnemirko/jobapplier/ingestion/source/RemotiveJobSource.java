@@ -10,8 +10,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -21,16 +19,17 @@ import com.gnemirko.jobapplier.contracts.JobPosting;
 import com.gnemirko.jobapplier.ingestion.dto.FetchContext;
 import com.gnemirko.jobapplier.ingestion.dto.FetchResult;
 import com.gnemirko.jobapplier.ingestion.dto.RemotiveJobsResponse;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Remotive public API. Terms: at most about 4 fetches a day; keep source and url
  * visible downstream for attribution.
  */
 @Component
+@Slf4j
 public class RemotiveJobSource implements JobSource {
 
     public static final String NAME = "remotive";
-    private static final Logger log = LoggerFactory.getLogger(RemotiveJobSource.class);
 
     private final RestClient client;
     private final String category;

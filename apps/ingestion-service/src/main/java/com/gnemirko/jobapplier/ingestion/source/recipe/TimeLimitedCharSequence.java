@@ -1,6 +1,10 @@
 package com.gnemirko.jobapplier.ingestion.source.recipe;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 /** Wraps a string so a regex match throws once its time limit passes (guards against backtracking blow-ups). */
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 final class TimeLimitedCharSequence implements CharSequence {
 
     static final class MatchTimeoutException extends RuntimeException {
@@ -14,11 +18,6 @@ final class TimeLimitedCharSequence implements CharSequence {
 
     static TimeLimitedCharSequence limited(CharSequence inner, long limitNanos) {
         return new TimeLimitedCharSequence(inner, System.nanoTime() + limitNanos);
-    }
-
-    private TimeLimitedCharSequence(CharSequence inner, long deadlineNanos) {
-        this.inner = inner;
-        this.deadlineNanos = deadlineNanos;
     }
 
     @Override

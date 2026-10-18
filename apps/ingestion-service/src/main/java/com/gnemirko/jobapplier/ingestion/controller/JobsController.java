@@ -10,16 +10,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.gnemirko.jobapplier.contracts.JobRecord;
 import com.gnemirko.jobapplier.ingestion.service.JobQueryService;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/jobs")
+@RequiredArgsConstructor
 public class JobsController {
 
     private final JobQueryService jobs;
-
-    public JobsController(JobQueryService jobs) {
-        this.jobs = jobs;
-    }
 
     /** Jobs first seen strictly after {@code since} (default: epoch), oldest first. */
     @GetMapping

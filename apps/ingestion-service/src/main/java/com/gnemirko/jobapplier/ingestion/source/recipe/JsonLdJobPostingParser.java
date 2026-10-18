@@ -13,13 +13,13 @@ import java.util.Optional;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import lombok.extern.slf4j.Slf4j;
 
 /** Reads the first schema.org JobPosting out of the application/ld+json blocks of an HTML page. */
+@Slf4j
 public final class JsonLdJobPostingParser {
 
     /** Fields as found on the page; identifier is null when the page has none. */
@@ -27,7 +27,6 @@ public final class JsonLdJobPostingParser {
             Instant postedAt, String description) {
     }
 
-    private static final Logger log = LoggerFactory.getLogger(JsonLdJobPostingParser.class);
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final DateTimeFormatter SPACE_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int MAX_LOCATION = 512;

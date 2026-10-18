@@ -16,8 +16,6 @@ import java.util.regex.Pattern;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.gnemirko.jobapplier.contracts.JobPosting;
 import com.gnemirko.jobapplier.ingestion.dto.FetchContext;
@@ -29,15 +27,15 @@ import com.gnemirko.jobapplier.ingestion.exception.RobotsDisallowedException;
 import com.gnemirko.jobapplier.ingestion.service.PoliteFetcher;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
 import com.gnemirko.jobapplier.ingestion.util.UrlCanonicalizer;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * The paginated-listing strategy: walk listing pages, collect detail links, read each new
  * detail page's JobPosting JSON-LD. All requests go through the polite fetcher; a blocked
  * response propagates as FetchBlockedException and fails the run.
  */
+@Slf4j
 public class RecipeJobSource implements JobSource {
-
-    private static final Logger log = LoggerFactory.getLogger(RecipeJobSource.class);
 
     private final Recipe recipe;
     private final PoliteFetcher fetcher;

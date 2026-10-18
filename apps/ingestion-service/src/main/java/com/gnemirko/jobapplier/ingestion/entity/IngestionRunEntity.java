@@ -8,8 +8,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "ingestion_runs")
 public class IngestionRunEntity {
 
@@ -20,6 +24,7 @@ public class IngestionRunEntity {
     private Long id;
 
     @Column(nullable = false, length = 64)
+    @Getter
     private String source;
 
     @Column(name = "started_at", nullable = false)
@@ -31,16 +36,18 @@ public class IngestionRunEntity {
     @Column(nullable = false, length = 16)
     private String status;
 
+    @Getter
     private int fetched;
+    @Getter
     private int inserted;
+    @Getter
     private int updated;
+    @Getter
     private int skipped;
 
     @Column(length = 2000)
+    @Getter
     private String error;
-
-    protected IngestionRunEntity() {
-    }
 
     public IngestionRunEntity(String source, Instant startedAt, Instant finishedAt, Status status,
             int fetched, int inserted, int updated, int skipped, String error) {
@@ -55,31 +62,7 @@ public class IngestionRunEntity {
         this.error = error == null ? null : error.substring(0, Math.min(error.length(), 2000));
     }
 
-    public String getSource() {
-        return source;
-    }
-
     public Status getStatus() {
         return Status.valueOf(status);
-    }
-
-    public int getFetched() {
-        return fetched;
-    }
-
-    public int getInserted() {
-        return inserted;
-    }
-
-    public int getUpdated() {
-        return updated;
-    }
-
-    public int getSkipped() {
-        return skipped;
-    }
-
-    public String getError() {
-        return error;
     }
 }

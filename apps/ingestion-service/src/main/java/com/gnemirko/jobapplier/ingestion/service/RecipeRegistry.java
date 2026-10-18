@@ -14,8 +14,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import org.jsoup.select.QueryParser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -26,12 +24,12 @@ import com.gnemirko.jobapplier.ingestion.source.recipe.EmbeddedJsonParser;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
+import lombok.extern.slf4j.Slf4j;
 
 /** Loads and validates recipe files once at startup. A bad file is logged and skipped. */
 @Service
+@Slf4j
 public class RecipeRegistry {
-
-    private static final Logger log = LoggerFactory.getLogger(RecipeRegistry.class);
 
     static final Pattern NAME = Pattern.compile("[a-z0-9-]{1,64}");
     static final int MAX_REGEX_LENGTH = 200;

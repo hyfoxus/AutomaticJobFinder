@@ -22,21 +22,20 @@ import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.gnemirko.jobapplier.ingestion.dto.FetchedPage;
 import com.gnemirko.jobapplier.ingestion.exception.FetchBlockedException;
 import com.gnemirko.jobapplier.ingestion.exception.FetchException;
 import com.gnemirko.jobapplier.ingestion.exception.RobotsDisallowedException;
 import com.gnemirko.jobapplier.ingestion.service.PoliteFetcher;
 import com.gnemirko.jobapplier.ingestion.util.UrlCanonicalizer;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Reads job URLs out of a sitemap: plain XML, gzip (detected by its magic bytes) or one level of
  * sitemap index. XML is parsed with DTDs and entities switched off. A problem with the root
  * sitemap, or a malformed child, throws and fails the run.
  */
+@Slf4j
 public class SitemapReader {
 
     public static final long MAX_UNCOMPRESSED_BYTES = 50L * 1024 * 1024;
@@ -46,7 +45,6 @@ public class SitemapReader {
 
     static final String NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9";
 
-    private static final Logger log = LoggerFactory.getLogger(SitemapReader.class);
     private static final long MATCH_LIMIT_NANOS = Duration.ofMillis(100).toNanos();
 
     /** A job URL as listed in the sitemap: canonical, with its lastmod truncated to seconds (or null). */
