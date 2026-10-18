@@ -37,6 +37,11 @@ final class StubSupport implements AutoCloseable {
     final Map<String, Stub> routes = new ConcurrentHashMap<>();
     final Map<String, AtomicInteger> hits = new ConcurrentHashMap<>();
     volatile java.util.concurrent.CountDownLatch gate;
+    /** Every request in arrival order, with the headers and body a POST test needs to check. */
+    record Seen(String method, String path, String accept, String acceptLanguage, String contentType, String body) {
+    }
+
+    final List<Seen> requests = new CopyOnWriteArrayList<>();
     final List<String> userAgents = new CopyOnWriteArrayList<>();
     final List<String> acceptEncodings = new CopyOnWriteArrayList<>();
 
@@ -47,6 +52,10 @@ final class StubSupport implements AutoCloseable {
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
             hits.computeIfAbsent(path, k -> new AtomicInteger()).incrementAndGet();
+            String reqBody = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            requests.add(new Seen(ex.getRequestMethod(), path, ex.getRequestHeaders().getFirst("Accept"),
+                    ex.getRequestHeaders().getFirst("Accept-Language"),
+                    ex.getRequestHeaders().getFirst("Content-Type"), reqBody));
             String ua = ex.getRequestHeaders().getFirst("User-Agent");
             userAgents.add(ua);
             String ae = ex.getRequestHeaders().getFirst("Accept-Encoding");
@@ -77,6 +86,10 @@ final class StubSupport implements AutoCloseable {
 
     void route(String path, Stub stub) {
         routes.put(path, stub);
+    }
+
+    List<Seen> requestsTo(String path) {
+        return requests.stream().filter(r -> r.path().equals(path)).toList();
     }
 
     int hits(String path) {

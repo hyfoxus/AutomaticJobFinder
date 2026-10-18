@@ -8,11 +8,13 @@ import tools.jackson.databind.JsonNode;
  * Declarative description of how to read one career site. Pure data; unknown fields are
  * rejected by the loader. Defaults are applied here, validation happens in the registry.
  */
-public record Recipe(String name, Boolean enabled, String strategy, Listing listing, Sitemap sitemap, Detail detail,
-        Limits limits) {
+public record Recipe(String name, Boolean enabled, String strategy, Listing listing, Sitemap sitemap,
+        Workday workday, Detail detail, Limits limits) {
 
     public static final String STRATEGY_PAGINATED_LISTING = "paginated-listing";
     public static final String STRATEGY_SITEMAP = "sitemap";
+    public static final String STRATEGY_WORKDAY = "workday";
+    public static final int DEFAULT_WORKDAY_MAX_PAGES = 50;
     public static final String EXTRACTOR_JSON_LD = "json-ld";
     public static final String EXTRACTOR_EMBEDDED_JSON = "embedded-json";
     public static final String ID_JSONLD = "jsonld";
@@ -25,9 +27,15 @@ public record Recipe(String name, Boolean enabled, String strategy, Listing list
         limits = limits == null ? new Limits(null) : limits;
     }
 
+    /** A sitemap recipe (no workday block). */
+    public Recipe(String name, Boolean enabled, String strategy, Listing listing, Sitemap sitemap, Detail detail,
+            Limits limits) {
+        this(name, enabled, strategy, listing, sitemap, null, detail, limits);
+    }
+
     /** A paginated-listing recipe (no sitemap block). */
     public Recipe(String name, Boolean enabled, String strategy, Listing listing, Detail detail, Limits limits) {
-        this(name, enabled, strategy, listing, null, detail, limits);
+        this(name, enabled, strategy, listing, null, null, detail, limits);
     }
 
     public boolean isEnabled() {
@@ -46,6 +54,15 @@ public record Recipe(String name, Boolean enabled, String strategy, Listing list
 
         public Sitemap {
             maxUrls = maxUrls == null ? DEFAULT_MAX_URLS : maxUrls;
+        }
+    }
+
+    /** A Workday tenant; the field mapping is fixed in code, so only these names are configurable. */
+    public record Workday(String host, String tenant, String site, String searchText, String company,
+            Integer maxPages) {
+
+        public Workday {
+            maxPages = maxPages == null ? DEFAULT_WORKDAY_MAX_PAGES : maxPages;
         }
     }
 

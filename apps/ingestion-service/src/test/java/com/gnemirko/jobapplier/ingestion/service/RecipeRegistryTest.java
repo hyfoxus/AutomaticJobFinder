@@ -139,4 +139,62 @@ class RecipeRegistryTest {
         assertThat(epam.sitemap().maxUrls()).isEqualTo(600);
         assertThat(epam.limits().maxDetailFetchesPerRun()).isEqualTo(300);
     }
+
+    private static String workday(String name, String block, String extra) {
+        return "{\"name\":\"" + name + "\",\"enabled\":false,\"strategy\":\"workday\",\"workday\":" + block + extra + "}";
+    }
+
+    private static final String WD = """
+            {"host":"acme.wd1.myworkdayjobs.com","tenant":"acme","site":"Careers","searchText":"java","company":"Acme"}""";
+
+    @Test
+    void workdayRecipeLoadsWithDefaults() throws Exception {
+        write("a.json", workday("alpha", WD, ""));
+        var r = new RecipeRegistry(dir, List.of()).recipes().get(0);
+        assertThat(r.workday().maxPages()).isEqualTo(50);
+        assertThat(r.workday().company()).isEqualTo("Acme");
+        assertThat(r.detail()).isNull();
+        assertThat(r.limits().maxDetailFetchesPerRun()).isEqualTo(200);
+    }
+
+    @Test
+    void badWorkdayRecipesAreSkipped() throws Exception {
+        write("a-good.json", workday("alpha", WD, ""));
+        write("b-no-block.json", "{\"name\":\"bravo\",\"strategy\":\"workday\"}");
+        write("c-host.json", workday("charlie", WD.replace("acme.wd1.myworkdayjobs.com", "acme.example.com"), ""));
+        write("d-host-suffix.json", workday("delta", WD.replace("acme.wd1.myworkdayjobs.com", "evilmyworkdayjobs.com"), ""));
+        write("e-host-path.json", workday("echo", WD.replace("acme.wd1.myworkdayjobs.com", "a.myworkdayjobs.com/x"), ""));
+        write("f-tenant.json", workday("foxtrot", WD.replace("\"acme\"", "\"a/b\""), ""));
+        write("g-site.json", workday("golf", WD.replace("Careers", "Car eers"), ""));
+        write("h-no-company.json", workday("hotel", WD.replace(",\"company\":\"Acme\"", ""), ""));
+        write("i-blank-company.json", workday("india", WD.replace("\"Acme\"", "\" \""), ""));
+        write("j-long-search.json", workday("juliet", WD.replace("java", "j".repeat(101)), ""));
+        write("k-ctrl-search.json", workday("kilo", WD.replace("java", "ja\\u0007va"), ""));
+        write("l-no-search.json", workday("lima", WD.replace("\"searchText\":\"java\",", ""), ""));
+        write("m-pages-0.json", workday("mike", WD.replace("}", ",\"maxPages\":0}"), ""));
+        write("n-pages-201.json", workday("november", WD.replace("}", ",\"maxPages\":201}"), ""));
+        write("o-detail.json", workday("oscar", WD, ",\"detail\":{\"extractor\":\"json-ld\",\"idFrom\":\"jsonld\"}"));
+        write("p-sitemap.json", workday("papa", WD, SITEMAP));
+        write("q-on-listing.json", good("quebec").replace("\"detail\"", "\"workday\":" + WD + ",\"detail\""));
+        write("r-on-sitemap.json", sitemapRecipe("romeo", SITEMAP, EMBEDDED, "").replace("\"detail\"", "\"workday\":" + WD + ",\"detail\""));
+        write("s-unknown-field.json", workday("sierra", WD.replace("}", ",\"mapping\":{}}"), ""));
+        write("t-cap.json", workday("tango", WD, ",\"limits\":{\"maxDetailFetchesPerRun\":5000}"));
+        write("u-bad-strategy.json", workday("uniform", WD, "").replace("\"workday\",", "\"nope\","));
+        write("v-long-label.json", workday("victor", WD.replace("acme.wd1", "a".repeat(64) + ".wd1"), ""));
+        write("w-label-63.json", workday("whiskey", WD.replace("acme.wd1", "a".repeat(63) + ".wd1"), ""));
+        write("z-ok.json", workday("zulu", WD.replace("}", ",\"maxPages\":200}"), ""));
+        assertThat(names()).containsExactly("alpha", "whiskey", "zulu");
+    }
+
+    @Test
+    void shippedDxcRecipeLoadsDisabled() {
+        var reg = new RecipeRegistry(Path.of("../../recipes"), List.of("remotive"));
+        var dxc = reg.recipes().stream().filter(r -> r.name().equals("dxc")).findFirst().orElseThrow();
+        assertThat(dxc.isEnabled()).isFalse();
+        assertThat(dxc.strategy()).isEqualTo("workday");
+        assertThat(dxc.workday().host()).isEqualTo("dxctechnology.wd1.myworkdayjobs.com");
+        assertThat(dxc.workday().site()).isEqualTo("DXCJobs");
+        assertThat(dxc.workday().company()).isEqualTo("DXC Technology");
+        assertThat(dxc.limits().maxDetailFetchesPerRun()).isEqualTo(150);
+    }
 }

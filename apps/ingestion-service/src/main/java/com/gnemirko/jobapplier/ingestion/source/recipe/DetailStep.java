@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.time.Instant;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,8 +19,6 @@ import com.gnemirko.jobapplier.ingestion.exception.FetchBlockedException;
 import com.gnemirko.jobapplier.ingestion.exception.FetchException;
 import com.gnemirko.jobapplier.ingestion.exception.RobotsDisallowedException;
 import com.gnemirko.jobapplier.ingestion.service.PoliteFetcher;
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -28,15 +27,20 @@ import lombok.extern.slf4j.Slf4j;
  * response propagates at once.
  */
 @Slf4j
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 final class DetailStep {
+
+    /** Turns the body of a successfully fetched page into a result; {@code link} is the public url. */
+    @FunctionalInterface
+    interface BodyReader {
+        DetailExtractor.Result read(FetchedPage page, URI link, Instant updatedAt);
+    }
 
     static final int MAX_CONSECUTIVE_DETAIL_FAILURES = 5;
     private static final Pattern CHARSET_PARAM = Pattern.compile("charset\\s*=\\s*[\"']?([^;\"'\\s]+)", Pattern.CASE_INSENSITIVE);
 
-    private final PoliteFetcher fetcher;
+    private final Function<URI, FetchedPage> fetch;
     private final String sourceName;
-    private final DetailExtractor extractor;
+    private final BodyReader reader;
     private final int cap;
     private int detailFetches;
     private int failStreak;
@@ -45,6 +49,32 @@ final class DetailStep {
     private int failed;
     private int bad;
     private int robotsSkipped;
+
+    /** The HTML path: pages fetched as-is and parsed with jsoup for the extractor. */
+    DetailStep(PoliteFetcher fetcher, String sourceName, DetailExtractor extractor, int cap) {
+        this(fetcher::fetch, sourceName, htmlReader(extractor), cap);
+    }
+
+    /** Pluggable path: any fetch function and body reader. */
+    DetailStep(Function<URI, FetchedPage> fetch, String sourceName, BodyReader reader, int cap) {
+        this.fetch = fetch;
+        this.sourceName = sourceName;
+        this.reader = reader;
+        this.cap = cap;
+    }
+
+    private static BodyReader htmlReader(DetailExtractor extractor) {
+        return (page, link, updatedAt) -> {
+            Document doc;
+            try {
+                doc = Jsoup.parse(new ByteArrayInputStream(page.body()), charsetOf(page.contentType()),
+                        page.finalUri().toString());
+            } catch (IOException e) {
+                return DetailExtractor.Result.BAD;
+            }
+            return extractor.extract(doc, link, updatedAt);
+        };
+    }
 
     /** The extractor a recipe asks for. */
     static DetailExtractor extractorFor(Recipe recipe, Pattern idPattern) {
@@ -88,13 +118,18 @@ final class DetailStep {
      * posting. Throws FetchBlockedException, or the last failure after too many in a row.
      */
     JobPosting process(URI link, Instant updatedAt) {
+        return process(link, link, updatedAt);
+    }
+
+    /** As above, with the fetch address kept apart from the public url the posting is stored under. */
+    JobPosting process(URI fetchUri, URI link, Instant updatedAt) {
         FetchException failure = null;
         boolean requested = true;
         JobPosting posting = null;
         boolean lastExpired = false;
         FetchedPage page = null;
         try {
-            page = fetcher.fetch(link);
+            page = fetch.apply(fetchUri);
         } catch (RobotsDisallowedException e) {
             log.debug("Recipe '{}': {} disallowed by robots.txt", sourceName, link);
             requested = false;
@@ -117,20 +152,11 @@ final class DetailStep {
             failStreak = 0;
         }
         if (page != null && page.status() / 100 == 2) {
-            Document doc = null;
-            try {
-                doc = Jsoup.parse(new ByteArrayInputStream(page.body()), charsetOf(page.contentType()),
-                        page.finalUri().toString());
-            } catch (IOException e) {
-                // unusable page
-            }
-            if (doc != null) {
-                DetailExtractor.Result r = extractor.extract(doc, link, updatedAt);
-                posting = r.posting();
-                if (r.expired()) {
-                    lastExpired = true;
-                    expired++;
-                }
+            DetailExtractor.Result r = reader.read(page, link, updatedAt);
+            posting = r.posting();
+            if (r.expired()) {
+                lastExpired = true;
+                expired++;
             }
         }
         if (posting == null) {

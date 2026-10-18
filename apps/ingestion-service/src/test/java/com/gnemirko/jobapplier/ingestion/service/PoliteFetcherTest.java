@@ -335,4 +335,111 @@ class PoliteFetcherTest {
         FetchProperties p = StubSupport.props("127.0.0.1");
         return new FetchProperties(p.userAgent(), p.minDelay(), p.connectTimeout(), p.totalTimeout(), max, p.allowInsecureHosts());
     }
+
+    private static tools.jackson.databind.JsonNode json(String text) {
+        return tools.jackson.databind.json.JsonMapper.builder().build().readTree(text);
+    }
+
+    @Test
+    void postSendsExactBodyAndHeadersOnce() {
+        stub.route("/api", Stub.of(200, "{\"ok\":true}", "Content-Type", "application/json"));
+        FetchedPage page = rig.fetcher.post(stub.uri("/api"), json("{\"limit\":20,\"searchText\":\"a\\\"b\"}"));
+        assertThat(page.status()).isEqualTo(200);
+        assertThat(new String(page.body())).isEqualTo("{\"ok\":true}");
+        var posts = stub.requestsTo("/api");
+        assertThat(posts).hasSize(1);
+        var seen = posts.get(0);
+        assertThat(seen.method()).isEqualTo("POST");
+        assertThat(seen.body()).isEqualTo("{\"limit\":20,\"searchText\":\"a\\\"b\"}");
+        assertThat(seen.contentType()).isEqualTo("application/json");
+        assertThat(seen.accept()).isEqualTo("application/json");
+        assertThat(seen.acceptLanguage()).isEqualTo("en-US");
+        assertThat(stub.userAgents).allMatch(ua -> ua.equals("JobApplierBot/0.1 (personal job-search tool)"));
+        assertThat(stub.acceptEncodings).allMatch(ae -> ae.equals("identity"));
+    }
+
+    @Test
+    void getJsonAsksForJsonAndPlainGetDoesNot() {
+        stub.route("/api", Stub.of(200, "{}", "Content-Type", "application/json"));
+        rig.fetcher.fetchJson(stub.uri("/api"));
+        rig.fetcher.fetch(stub.uri("/page"));
+        var api = stub.requestsTo("/api").get(0);
+        assertThat(api.method()).isEqualTo("GET");
+        assertThat(api.accept()).isEqualTo("application/json");
+        assertThat(api.acceptLanguage()).isEqualTo("en-US");
+        var plain = stub.requestsTo("/page").get(0);
+        assertThat(plain.accept()).isNotEqualTo("application/json");
+        assertThat(plain.acceptLanguage()).isNull();
+    }
+
+    @Test
+    void postToDisallowedPathIsNeverSent() {
+        stub.route("/private/api", Stub.of(200, "{}"));
+        assertThatThrownBy(() -> rig.fetcher.post(stub.uri("/private/api"), json("{}")))
+                .isInstanceOf(RobotsDisallowedException.class);
+        assertThat(stub.hits("/private/api")).isZero();
+    }
+
+    @Test
+    void postRedirectIsRefusedAfterExactlyOneRequest() {
+        for (int status : new int[] {301, 302, 303, 307, 308}) {
+            stub.route("/api" + status, Stub.of(status, "", "Location", "/page"));
+            assertThatThrownBy(() -> rig.fetcher.post(stub.uri("/api" + status), json("{}")))
+                    .isInstanceOf(FetchException.class).hasMessageContaining("refused for POST");
+            assertThat(stub.requestsTo("/api" + status)).hasSize(1);
+        }
+        assertThat(stub.hits("/page")).isZero();
+    }
+
+    @Test
+    void postBlockedStatusesAreBlocked() {
+        stub.route("/a403", Stub.of(403, "no"));
+        stub.route("/a429", Stub.of(429, "slow"));
+        assertThatThrownBy(() -> rig.fetcher.post(stub.uri("/a403"), json("{}"))).isInstanceOf(FetchBlockedException.class);
+        assertThatThrownBy(() -> rig.fetcher.post(stub.uri("/a429"), json("{}"))).isInstanceOf(FetchBlockedException.class);
+        assertThat(stub.requestsTo("/a429")).hasSize(1);
+    }
+
+    @Test
+    void postServerErrorIsTransientAndClientErrorIsReturned() {
+        stub.route("/a500", Stub.of(500, "boom"));
+        stub.route("/a400", Stub.of(400, "bad"));
+        assertThatThrownBy(() -> rig.fetcher.post(stub.uri("/a500"), json("{}"))).isInstanceOf(FetchException.class)
+                .isNotInstanceOf(FetchBlockedException.class);
+        assertThat(rig.fetcher.post(stub.uri("/a400"), json("{}")).status()).isEqualTo(400);
+    }
+
+    @Test
+    void postRefusesUnsafeUrlsAndOversizeAnswers() {
+        Rig strict = new Rig(StubSupport.props(), time);
+        assertThatThrownBy(() -> strict.fetcher.post(stub.uri("/api"), json("{}"))).isInstanceOf(FetchException.class);
+        assertThatThrownBy(() -> strict.fetcher.post(URI.create("https://127.0.0.1/api"), json("{}")))
+                .isInstanceOf(FetchException.class);
+        assertThat(stub.requestsTo("/api")).isEmpty();
+
+        Rig small = new Rig(smallLimit(10), time);
+        stub.route("/big", Stub.of(200, "x".repeat(100)));
+        assertThatThrownBy(() -> small.fetcher.post(stub.uri("/big"), json("{}"))).isInstanceOf(FetchException.class)
+                .hasMessageContaining("too large");
+        assertThat(stub.requestsTo("/big")).hasSize(1);
+    }
+
+    @Test
+    void postChallengeResponsesAreBlocked() {
+        stub.route("/cf", Stub.of(200, "x", "cf-mitigated", "challenge"));
+        stub.route("/c503", Stub.of(503, "<html><title>Just a moment...</title></html>"));
+        assertThatThrownBy(() -> rig.fetcher.post(stub.uri("/cf"), json("{}"))).isInstanceOf(FetchBlockedException.class);
+        assertThatThrownBy(() -> rig.fetcher.post(stub.uri("/c503"), json("{}"))).isInstanceOf(FetchBlockedException.class);
+        assertThat(stub.requestsTo("/cf")).hasSize(1);
+        assertThat(stub.requestsTo("/c503")).hasSize(1);
+    }
+
+    @Test
+    void postIsPacedLikeGet() {
+        stub.route("/api", Stub.of(200, "{}"));
+        rig.fetcher.post(stub.uri("/api"), json("{}"));
+        time.sleeps.clear();
+        rig.fetcher.post(stub.uri("/api"), json("{}"));
+        assertThat(time.total()).isPositive();
+    }
 }

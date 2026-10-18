@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.gnemirko.jobapplier.ingestion.dto.Recipe;
+import com.gnemirko.jobapplier.ingestion.entity.JobEntity;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
 import com.gnemirko.jobapplier.ingestion.source.recipe.EmbeddedJsonParser;
 
@@ -33,6 +34,9 @@ public class RecipeRegistry {
 
     static final Pattern NAME = Pattern.compile("[a-z0-9-]{1,64}");
     static final int MAX_REGEX_LENGTH = 200;
+    private static final Pattern WORKDAY_HOST = Pattern.compile("[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\\.myworkdayjobs\\.com");
+    private static final Pattern WORKDAY_NAME = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+    static final int MAX_SEARCH_TEXT = 100;
     /** A group holding a quantifier that is itself quantified, e.g. (a+)+ or (a*){2,}. */
     private static final Pattern NESTED_QUANTIFIER = Pattern.compile("\\([^()]*[+*}][^()]*\\)\\s*[+*{]");
 
@@ -98,10 +102,14 @@ public class RecipeRegistry {
         }
         Recipe.Listing l = r.listing();
         Recipe.Sitemap sm = r.sitemap();
+        Recipe.Workday wd = r.workday();
         Recipe.Detail d = r.detail();
         if (Recipe.STRATEGY_PAGINATED_LISTING.equals(r.strategy())) {
             if (sm != null) {
                 throw new IllegalArgumentException("sitemap block does not belong to strategy paginated-listing");
+            }
+            if (wd != null) {
+                throw new IllegalArgumentException("workday block does not belong to strategy paginated-listing");
             }
             if (l == null) {
                 throw new IllegalArgumentException("listing is required");
@@ -111,21 +119,68 @@ public class RecipeRegistry {
             if (l != null) {
                 throw new IllegalArgumentException("listing block does not belong to strategy sitemap");
             }
+            if (wd != null) {
+                throw new IllegalArgumentException("workday block does not belong to strategy sitemap");
+            }
             if (sm == null) {
                 throw new IllegalArgumentException("sitemap is required");
             }
             validateSitemap(sm);
+        } else if (Recipe.STRATEGY_WORKDAY.equals(r.strategy())) {
+            if (l != null || sm != null) {
+                throw new IllegalArgumentException("listing and sitemap blocks do not belong to strategy workday");
+            }
+            if (d != null) {
+                throw new IllegalArgumentException("detail block does not belong to strategy workday");
+            }
+            if (wd == null) {
+                throw new IllegalArgumentException("workday is required");
+            }
+            validateWorkday(wd);
         } else {
             throw new IllegalArgumentException("unsupported strategy " + r.strategy());
         }
-        if (d == null) {
-            throw new IllegalArgumentException("detail is required");
+        if (!Recipe.STRATEGY_WORKDAY.equals(r.strategy())) {
+            if (d == null) {
+                throw new IllegalArgumentException("detail is required");
+            }
+            validateDetail(d);
         }
-        validateDetail(d);
         int cap = r.limits().maxDetailFetchesPerRun();
         if (cap < 1 || cap > 1000) {
             throw new IllegalArgumentException("limits.maxDetailFetchesPerRun must be 1..1000");
         }
+    }
+
+    private static void validateWorkday(Recipe.Workday w) {
+        if (w.host() == null || w.host().length() > 253 || hasLongLabel(w.host()) || !WORKDAY_HOST.matcher(w.host()).matches()) {
+            throw new IllegalArgumentException("workday.host must be a host name ending .myworkdayjobs.com");
+        }
+        if (w.tenant() == null || !WORKDAY_NAME.matcher(w.tenant()).matches()) {
+            throw new IllegalArgumentException("workday.tenant must match [A-Za-z0-9_-]{1,64}");
+        }
+        if (w.site() == null || !WORKDAY_NAME.matcher(w.site()).matches()) {
+            throw new IllegalArgumentException("workday.site must match [A-Za-z0-9_-]{1,64}");
+        }
+        if (w.searchText() == null || w.searchText().length() > MAX_SEARCH_TEXT || hasControlChars(w.searchText())) {
+            throw new IllegalArgumentException(
+                    "workday.searchText is required, at most " + MAX_SEARCH_TEXT + " characters, no control characters");
+        }
+        if (w.company() == null || w.company().isBlank() || w.company().length() > JobEntity.MAX_TEXT
+                || hasControlChars(w.company())) {
+            throw new IllegalArgumentException("workday.company is required (no control characters)");
+        }
+        if (w.maxPages() < 1 || w.maxPages() > 200) {
+            throw new IllegalArgumentException("workday.maxPages must be 1..200");
+        }
+    }
+
+    private static boolean hasLongLabel(String host) {
+        return java.util.Arrays.stream(host.split("\\.", -1)).anyMatch(l -> l.length() > 63);
+    }
+
+    private static boolean hasControlChars(String s) {
+        return s.chars().anyMatch(Character::isISOControl);
     }
 
     private static void validateListing(Recipe.Listing l) {

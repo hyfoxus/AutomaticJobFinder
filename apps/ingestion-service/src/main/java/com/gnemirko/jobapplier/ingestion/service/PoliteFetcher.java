@@ -14,6 +14,9 @@ import com.gnemirko.jobapplier.ingestion.exception.FetchException;
 import com.gnemirko.jobapplier.ingestion.exception.RobotsDisallowedException;
 import com.gnemirko.jobapplier.ingestion.util.UrlPolicy;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
 /**
  * Fetches one page while honouring robots.txt, per-host pacing, SSRF rules, size and time limits,
  * and stopping at bot challenges. Knows nothing about recipes, the database or LLMs.
@@ -22,6 +25,7 @@ import com.gnemirko.jobapplier.ingestion.util.UrlPolicy;
 public class PoliteFetcher {
 
     private static final int MAX_REDIRECTS = 5;
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     private final FetchProperties props;
     private final UrlPolicy policy;
@@ -55,6 +59,47 @@ public class PoliteFetcher {
     }
 
     public FetchedPage fetch(URI uri, long maxBodyBytes) {
+        return fetch(uri, maxBodyBytes, false);
+    }
+
+    /** Like {@link #fetch(URI)} but sends {@code Accept: application/json}. */
+    public FetchedPage fetchJson(URI uri) {
+        return fetch(uri, props.maxBodyBytes(), true);
+    }
+
+    /**
+     * POSTs a JSON body. Validated, robots-checked and paced like a GET, but a redirect of any kind
+     * is an error: a POST is sent exactly once and never re-sent elsewhere.
+     */
+    public FetchedPage post(URI uri, JsonNode body) {
+        policy.validate(uri);
+        RobotsService.Rules rules = robots.rulesFor(uri);
+        if (!rules.isAllowed(uri)) {
+            throw new RobotsDisallowedException("robots.txt disallows " + uri);
+        }
+        byte[] json;
+        try {
+            json = MAPPER.writeValueAsBytes(body);
+        } catch (RuntimeException e) {
+            throw new FetchException("Cannot serialise request body", e);
+        }
+        Duration delay = props.minDelay().compareTo(rules.crawlDelay()) >= 0 ? props.minDelay() : rules.crawlDelay();
+        Deadline deadline = new Deadline(nanos, props.totalTimeout());
+        pacer.pace(UrlPolicy.hostKey(uri), delay, deadline);
+        HttpExchange.Reply reply = exchange.postJson(uri, json, props.maxBodyBytes(), deadline);
+        if (reply.isBlocked()) {
+            throw new FetchBlockedException("Host refused automated access (status " + reply.status() + ")");
+        }
+        if (reply.isRedirect()) {
+            throw new FetchException("Redirect (status " + reply.status() + ") refused for POST to " + uri);
+        }
+        if (reply.status() >= 500) {
+            throw new FetchException("Server error " + reply.status() + " for " + uri);
+        }
+        return new FetchedPage(uri, reply.status(), reply.contentType(), reply.body());
+    }
+
+    private FetchedPage fetch(URI uri, long maxBodyBytes, boolean json) {
         policy.validate(uri);
         RobotsService.Rules rules = robots.rulesFor(uri);
         if (!rules.isAllowed(uri)) {
@@ -76,7 +121,8 @@ public class PoliteFetcher {
                 }
             }
             pacer.pace(key, delay, deadline);
-            HttpExchange.Reply reply = exchange.get(current, maxBodyBytes, true, deadline);
+            HttpExchange.Reply reply = json ? exchange.getJson(current, maxBodyBytes, deadline)
+                    : exchange.get(current, maxBodyBytes, true, deadline);
             if (reply.isBlocked()) {
                 throw new FetchBlockedException("Host refused automated access (status " + reply.status() + ")");
             }

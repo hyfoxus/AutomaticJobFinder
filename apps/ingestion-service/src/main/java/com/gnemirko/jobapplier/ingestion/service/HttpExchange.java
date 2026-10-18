@@ -19,14 +19,16 @@ import com.gnemirko.jobapplier.ingestion.util.UrlPolicy;
 
 import okhttp3.Dns;
 import okhttp3.HttpUrl;
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 import okio.Buffer;
 import okio.BufferedSource;
 
 /**
- * One HTTP GET, no redirects, bounded body. The address filter runs inside the client's own DNS
+ * One HTTP request (GET or JSON POST), no redirects, bounded body. The address filter runs inside the client's own DNS
  * lookup, so the address that is checked is the address that is connected to.
  */
 @Component
@@ -62,6 +64,8 @@ class HttpExchange {
         }
     }
 
+    private static final MediaType JSON = MediaType.get("application/json");
+
     private final FetchProperties props;
     private final OkHttpClient client;
 
@@ -94,20 +98,52 @@ class HttpExchange {
      *                    false: the body is silently cut at {@code maxBytes}
      */
     Reply get(URI uri, long maxBytes, boolean strictLimit, Deadline deadline) {
+        HttpUrl url = parse(uri);
+        return execute(base(url).get().build(), maxBytes, strictLimit, deadline);
+    }
+
+    /** GET asking for JSON; same limits as {@link #get}, always strict. */
+    Reply getJson(URI uri, long maxBytes, Deadline deadline) {
+        HttpUrl url = parse(uri);
+        Request request = base(url)
+                .header("Accept", "application/json")
+                .header("Accept-Language", "en-US")
+                .get()
+                .build();
+        return execute(request, maxBytes, true, deadline);
+    }
+
+    /** POST of a JSON body; the reply is never redirected or re-sent, and the size limit is strict. */
+    Reply postJson(URI uri, byte[] json, long maxBytes, Deadline deadline) {
+        HttpUrl url = parse(uri);
+        Request request = base(url)
+                .header("Accept", "application/json")
+                .header("Accept-Language", "en-US")
+                .post(RequestBody.create(json, JSON))
+                .build();
+        return execute(request, maxBytes, true, deadline);
+    }
+
+    private static HttpUrl parse(URI uri) {
         HttpUrl url = HttpUrl.parse(uri.toString());
         if (url == null) {
             throw new FetchException("Unusable URL: " + uri);
         }
+        return url;
+    }
+
+    private Request.Builder base(HttpUrl url) {
+        return new Request.Builder()
+                .url(url)
+                .header("User-Agent", props.userAgent())
+                .header("Accept-Encoding", "identity");
+    }
+
+    private Reply execute(Request request, long maxBytes, boolean strictLimit, Deadline deadline) {
         Duration remaining = deadline.remaining();
         if (remaining.isNegative() || remaining.isZero()) {
             throw new FetchException("Fetch deadline exceeded");
         }
-        Request request = new Request.Builder()
-                .url(url)
-                .header("User-Agent", props.userAgent())
-                .header("Accept-Encoding", "identity")
-                .get()
-                .build();
         java.util.concurrent.atomic.AtomicInteger networkRequests = new java.util.concurrent.atomic.AtomicInteger();
         OkHttpClient perCall = client.newBuilder().callTimeout(remaining)
                 .addNetworkInterceptor(chain -> {

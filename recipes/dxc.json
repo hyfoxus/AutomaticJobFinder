@@ -1,0 +1,15 @@
+{
+  "name": "dxc",
+  "enabled": false,
+  "strategy": "workday",
+  "workday": {
+    "host": "dxctechnology.wd1.myworkdayjobs.com",
+    "tenant": "dxctechnology",
+    "site": "DXCJobs",
+    "searchText": "java",
+    "company": "DXC Technology"
+  },
+  "limits": {
+    "maxDetailFetchesPerRun": 150
+  }
+}
