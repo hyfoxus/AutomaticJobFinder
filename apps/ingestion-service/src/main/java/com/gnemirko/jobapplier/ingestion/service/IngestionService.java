@@ -65,12 +65,22 @@ public class IngestionService {
             return tx.execute(status -> store(source.name(), started, result));
         } catch (FetchBlockedException e) {
             log.error("Ingestion of '{}' blocked: {}", source.name(), e.getMessage());
-            return runs.save(new IngestionRunEntity(source.name(), started, clock.instant(), Status.FAILED,
-                    0, 0, 0, 0, "blocked"));
+            return recordFailure(source.name(), started, "blocked");
         } catch (RuntimeException e) {
             log.error("Ingestion of '{}' failed", source.name(), e);
-            return runs.save(new IngestionRunEntity(source.name(), started, clock.instant(), Status.FAILED,
-                    0, 0, 0, 0, e.toString()));
+            return recordFailure(source.name(), started, e.toString());
+        }
+    }
+
+    /** Saving the failure can itself fail (e.g. database down); that must not abort the other sources. */
+    private IngestionRunEntity recordFailure(String sourceName, Instant started, String error) {
+        IngestionRunEntity run = new IngestionRunEntity(sourceName, started, clock.instant(), Status.FAILED,
+                0, 0, 0, 0, error);
+        try {
+            return runs.save(run);
+        } catch (RuntimeException e) {
+            log.error("Could not record the failed run of '{}'", sourceName, e);
+            return run;
         }
     }
 
