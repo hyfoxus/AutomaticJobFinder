@@ -2,3 +2,4 @@ rootProject.name = 'JobApplier'
 
 include 'apps:contracts'
 include 'apps:ingestion-service'
+include 'apps:scoring-service'

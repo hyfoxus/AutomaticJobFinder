@@ -1,0 +1,40 @@
+# Copy to profile.yml (git-ignored) and edit. Read by the scoring service when SCORING_ENABLED=true;
+# the path is SCORING_PROFILE_PATH (default ./profile.yml). Model, output cap, temperature and prices
+# are service settings, not profile keys: see apps/scoring-service/src/main/resources/application.properties. Unknown keys stop startup, so a stray
+# CV, name or contact field can never be read by accident.
+
+# Required. A few sentences, anonymised: skills and seniority, no name, employer or contact details.
+# This text is sent to the model.
+skillsSummary: "Senior Java backend engineer, 10 years. Spring Boot, PostgreSQL, Kafka, AWS."
+
+# Required, at least one. Your non-negotiable requirements for a job. They are sent to the model as
+# a numbered list and it reports which numbers a job satisfies. This text is sent to the model.
+mustHaves:
+  - Java or Kotlin backend role
+  - Spring Boot
+  - Fully remote or remote within Europe
+
+# Optional. Pluses that do not decide the verdict. Sent to the model.
+niceToHaves:
+  - Kubernetes
+  - Event-driven systems
+
+# Optional. What you want from the next job. Sent to the model.
+goals:
+  - Grow towards platform or architecture work
+
+# Optional. Hard filters, applied in code before any model call. They cost nothing and are never sent.
+filters:
+  # Java regular expressions, case-insensitive, matched anywhere in the job title.
+  # A job whose title matches any of them is dropped. Each match has a short time limit.
+  excludeTitleRegex:
+    - "\\bintern(ship)?\\b"
+    - "\\bjunior\\b"
+  # Company names to skip: whole name, case-insensitive.
+  excludeCompanies:
+    - Example Staffing Ltd
+  # A job is kept only if its location contains one of these words (case-insensitive).
+  # Leave empty for no location filter. A job with no location always passes.
+  allowedLocationKeywords:
+    - remote
+    - europe

@@ -1,0 +1,17 @@
+skillsSummary: "Senior Java backend engineer, Spring Boot, PostgreSQL, 10 years."
+mustHaves:
+  - Java
+  - Spring Boot
+  - Remote work
+niceToHaves:
+  - Kubernetes
+goals:
+  - Move into platform engineering
+filters:
+  excludeTitleRegex:
+    - "(?i)\\bintern\\b"
+  excludeCompanies:
+    - BadCorp
+  allowedLocationKeywords:
+    - remote
+    - europe

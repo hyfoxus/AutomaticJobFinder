@@ -40,3 +40,6 @@ out/
 secrets/
 apps/*/.env
 .env
+
+### Scoring profile (personal) ###
+profile.yml
