@@ -134,4 +134,19 @@ class StartupFailureTest {
                 .withUserConfiguration(Base.class)
                 .run(ctx -> assertThat(ctx).hasNotFailed().doesNotHaveBean("profile"));
     }
+
+    @Test
+    void badIngestionSettingsFailFast() {
+        String[][] cases = {
+                {"scoring.ingestion.overlap=0s", "overlap"},
+                {"scoring.ingestion.overlap=-5m", "overlap"},
+                {"scoring.ingestion.chunk-size=0", "chunk-size"},
+                {"scoring.ingestion.max-bytes=0", "max-bytes"}};
+        for (String[] c : cases) {
+            runner(c[0]).withUserConfiguration(WithModel.class).run(ctx -> {
+                assertThat(ctx).hasFailed();
+                assertThat(rootMessage(ctx.getStartupFailure())).contains(c[1]);
+            });
+        }
+    }
 }

@@ -29,7 +29,9 @@ class CostModelTest {
     void freeModelCostsNothing() {
         ScoringProperties p = new ScoringProperties(true, "x", 3,
                 new ScoringProperties.Llm("llama3", true, 500, 6000, Map.of(), null),
-                new ScoringProperties.Budget(new BigDecimal("1"), "UTC"));
+                new ScoringProperties.Budget(new BigDecimal("1"), "UTC"),
+                new ScoringProperties.Ingestion("http://localhost:8081", java.time.Duration.ofMinutes(5), 50, "-",
+                        java.time.Duration.ofSeconds(5), java.time.Duration.ofSeconds(60), 1_000_000));
         CostModel cost = new CostModel(p);
         assertThat(cost.costMicros(1_000_000, 1_000_000)).isZero();
         assertThat(cost.worstCaseMicros(10_000)).isZero();

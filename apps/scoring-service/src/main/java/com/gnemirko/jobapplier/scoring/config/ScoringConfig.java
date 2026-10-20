@@ -7,6 +7,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.context.annotation.Configuration;
 
 import com.gnemirko.jobapplier.scoring.dto.Profile;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Configuration
 @ScoringEnabled
+@EnableScheduling
 public class ScoringConfig {
 
     @Bean
@@ -66,6 +68,7 @@ public class ScoringConfig {
             throw new ScoringConfigurationException("scoring.budget.daily-usd must be greater than 0");
         }
         props.budget().zoneId();
+        props.ingestion().validate();
     }
 
     /** Marker so beans can depend on the settings having been checked first. */

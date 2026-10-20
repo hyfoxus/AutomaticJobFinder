@@ -22,5 +22,12 @@ class ScoringDisabledTest {
     void startsWithoutAnyScoringBeans() {
         assertThat(context.getBeanNamesForType(ScoringService.class)).isEmpty();
         assertThat(context.getBeanNamesForType(ChatModel.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.scoring.source.IngestionClient.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.scoring.service.ScoringRunner.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.scoring.service.ScoringScheduler.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.scoring.controller.AssessmentController.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.scoring.controller.UsageController.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.scoring.controller.RunController.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.scoring.config.ApiGuardFilter.class)).isEmpty();
     }
 }

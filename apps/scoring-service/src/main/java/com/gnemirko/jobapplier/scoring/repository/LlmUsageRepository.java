@@ -12,4 +12,6 @@ public interface LlmUsageRepository extends JpaRepository<LlmUsageEntity, Long> 
 
     @Query("select coalesce(sum(u.micros), 0) from LlmUsageEntity u where u.day = :day")
     long sumMicrosForDay(@Param("day") LocalDate day);
+
+    long countByDay(LocalDate day);
 }

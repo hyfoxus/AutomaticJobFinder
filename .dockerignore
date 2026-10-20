@@ -5,3 +5,7 @@
 *.iml
 out/
 HELP.md
+**/.env
+**/profile.yml
+config/
+secrets/

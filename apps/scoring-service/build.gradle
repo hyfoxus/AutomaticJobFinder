@@ -38,4 +38,6 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // Tests never run the schedule on their own.
+    environment 'SCORING_INGESTION_CRON', '-'
 }

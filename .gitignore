@@ -43,3 +43,5 @@ apps/*/.env
 
 ### Scoring profile (personal) ###
 profile.yml
+config/*
+!config/.gitkeep

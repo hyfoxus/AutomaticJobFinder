@@ -22,7 +22,9 @@ final class UnitSupport {
         return new ScoringProperties(true, "x", 3,
                 new ScoringProperties.Llm("m", false, maxTokens, 6000,
                         Map.of("m", new ScoringProperties.Price(BigDecimal.valueOf(inPrice), BigDecimal.valueOf(outPrice))), null),
-                new ScoringProperties.Budget(new BigDecimal(capUsd), "UTC"));
+                new ScoringProperties.Budget(new BigDecimal(capUsd), "UTC"),
+                new ScoringProperties.Ingestion("http://localhost:8081", java.time.Duration.ofMinutes(5), 50, "-",
+                        java.time.Duration.ofSeconds(5), java.time.Duration.ofSeconds(60), 1_000_000));
     }
 
     static JobPosting posting(String title, String company, String location, String description) {

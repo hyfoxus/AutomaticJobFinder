@@ -6,7 +6,8 @@ usage() {
 Usage: scripts/setup.sh [--build]
 
 Creates apps/*/.env from each .env.sample when missing, then starts the stack
-with docker compose using apps/ingestion-service/.env for configuration. Add --build to force image rebuilds.
+with docker compose using apps/ingestion-service/.env for configuration (scoring reads apps/scoring-service/.env itself;
+its port is set with SCORING_HTTP_PORT in your shell or the ingestion .env). Add --build to force image rebuilds.
 USAGE
 }
 
@@ -32,4 +33,5 @@ done
 
 # --env-file makes the values in apps/ingestion-service/.env reach compose interpolation.
 docker compose --env-file apps/ingestion-service/.env up -d $BUILD_FLAG
-echo "Ingestion health: http://localhost:${INGESTION_HTTP_PORT:-8081}/actuator/health"
+echo "Ingestion health: http://127.0.0.1:${INGESTION_HTTP_PORT:-8081}/actuator/health"
+echo "Scoring health:   http://127.0.0.1:${SCORING_HTTP_PORT:-8082}/actuator/health"

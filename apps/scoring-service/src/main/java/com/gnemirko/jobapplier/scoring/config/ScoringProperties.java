@@ -3,6 +3,7 @@ package com.gnemirko.jobapplier.scoring.config;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DateTimeException;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Map;
 
@@ -18,7 +19,47 @@ public record ScoringProperties(
         @DefaultValue("./profile.yml") String profilePath,
         @DefaultValue("3") int maxAttempts,
         @DefaultValue Llm llm,
-        @DefaultValue Budget budget) {
+        @DefaultValue Budget budget,
+        @DefaultValue Ingestion ingestion) {
+
+    /**
+     * @param baseUrl        ingestion service root
+     * @param overlap        how far before the cursor each pull starts; must be positive
+     * @param chunkSize      jobs handed to scoring at a time
+     * @param cron           schedule of the pull; {@code -} disables it
+     * @param connectTimeout connect timeout of the pull
+     * @param readTimeout    read timeout of the pull
+     * @param maxBytes       largest accepted response body
+     */
+    public record Ingestion(
+            @DefaultValue("http://localhost:8081") String baseUrl,
+            @DefaultValue("5m") Duration overlap,
+            @DefaultValue("50") int chunkSize,
+            @DefaultValue("0 15 */6 * * *") String cron,
+            @DefaultValue("5s") Duration connectTimeout,
+            @DefaultValue("60s") Duration readTimeout,
+            @DefaultValue("67108864") long maxBytes) {
+
+        /** Refuses settings that would make the pull unsafe or endless. */
+        public void validate() {
+            if (baseUrl == null || baseUrl.isBlank()) {
+                throw new ScoringConfigurationException("scoring.ingestion.base-url must be set");
+            }
+            if (overlap == null || overlap.isZero() || overlap.isNegative()) {
+                throw new ScoringConfigurationException("scoring.ingestion.overlap must be greater than 0");
+            }
+            if (chunkSize < 1) {
+                throw new ScoringConfigurationException("scoring.ingestion.chunk-size must be at least 1");
+            }
+            if (connectTimeout == null || connectTimeout.isZero() || connectTimeout.isNegative()
+                    || readTimeout == null || readTimeout.isZero() || readTimeout.isNegative()) {
+                throw new ScoringConfigurationException("scoring.ingestion timeouts must be greater than 0");
+            }
+            if (maxBytes < 1) {
+                throw new ScoringConfigurationException("scoring.ingestion.max-bytes must be at least 1");
+            }
+        }
+    }
 
     /**
      * @param model                name sent to the provider and key into {@code prices}

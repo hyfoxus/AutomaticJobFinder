@@ -49,9 +49,10 @@ class FlywayIsolationTest {
             assertThat(scoring.migrate().success).isTrue();
 
             assertThat(count(st, "select count(*) from information_schema.tables where table_schema='scoring' "
-                    + "and table_name in ('assessments','llm_usage','flyway_schema_history')")).isEqualTo(3);
+                    + "and table_name in ('assessments','llm_usage','ingest_cursor','flyway_schema_history')")).isEqualTo(4);
             assertThat(count(st, "select count(*) from public.flyway_schema_history")).isEqualTo(publicBefore);
             assertThat(count(st, "select count(*) from scoring.flyway_schema_history where version = '1'")).isEqualTo(1);
+            assertThat(count(st, "select count(*) from scoring.flyway_schema_history where version = '2'")).isEqualTo(1);
         }
     }
 
