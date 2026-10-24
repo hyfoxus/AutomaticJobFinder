@@ -24,8 +24,9 @@ import lombok.extern.slf4j.Slf4j;
 public class ScoringConfig {
 
     @Bean
-    ScoringSettingsCheck scoringSettingsCheck(ScoringProperties props, Environment env) {
+    ScoringSettingsCheck scoringSettingsCheck(ScoringProperties props, ApiProperties api, Environment env) {
         check(props);
+        api.normalizedHosts();
         String provider = env.getProperty("spring.ai.model.chat", "none");
         if (props.llm().free() && ("openai".equalsIgnoreCase(provider) || "anthropic".equalsIgnoreCase(provider))) {
             throw new ScoringConfigurationException("scoring.llm.free=true is only allowed for a local provider "

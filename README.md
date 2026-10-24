@@ -2,7 +2,7 @@
 
 Self-hosted tool that scans job sources, scores vacancies against your profile with an LLM, and emails a daily digest. Built as a small set of Spring Boot services in one monorepo.
 
-> Stage 1 is in progress. The ingestion service and the scoring service exist so far.
+> Stage 1 is in progress. The ingestion, scoring and digest services exist so far.
 
 ---
 
@@ -19,6 +19,10 @@ Self-hosted tool that scans job sources, scores vacancies against your profile w
 JobApplier/                       Monorepo root
 ├─ apps/
 │  ├─ contracts/                  Shared DTOs, no logic
+│  ├─ digest-service/             Emails a digest of newly scored vacancies (off by default)
+│  │  ├─ docker/entrypoint.sh     Secret loader used inside the runtime image
+│  │  ├─ Dockerfile               Multi-stage build (context = repo root)
+│  │  └─ .env.sample              Template for service environment variables
 │  ├─ scoring-service/            Pulls new vacancies, filters and scores them under a daily cost cap
 │  │  ├─ docker/entrypoint.sh     Secret loader used inside the runtime image
 │  │  ├─ Dockerfile               Multi-stage build (context = repo root)
@@ -83,4 +87,24 @@ curl -X POST -H "X-JobApplier-Run: 1" http://127.0.0.1:8082/api/scoring/run   # 
 
 Assessment text (`reason`, gap texts) is written by the model: escape it wherever you display it. Job descriptions are never returned.
 
-Network notes: scoring and ingestion are published on loopback only. Ingestion stays reachable from the other containers on `monorepo-net` at `http://ingestion-service:8081`. A new module must be added to both Dockerfiles' `COPY` lines (each copies only the other services' `build.gradle`).
+Network notes: scoring and ingestion are published on loopback only. Ingestion stays reachable from the other containers on `monorepo-net` at `http://ingestion-service:8081`. A new module must be added to the other Dockerfiles' `COPY` lines (each copies only the other services' `build.gradle`).
+
+Scoring answers only to Host names on `scoring.api.allowed-hosts` (`SCORING_API_ALLOWED_HOSTS`, default `localhost,127.0.0.1`; compose adds `scoring-service` so the digest service can reach it). `GET /api/assessments` also takes `scoredSince` (ISO instant) and `afterId`: SCORED rows only, oldest scored first.
+
+---
+
+## Digest service
+
+Off by default (`digest.enabled=false`): the container starts and reports healthy, with no digest beans. It reads newly SCORED assessments from the scoring REST API (never the scoring database), so scoring must be enabled too.
+
+1. In `apps/digest-service/.env` set `DIGEST_ENABLED=true`. The default mode is `dry-run`: each run writes `digest-<UTC time>.html` and `.txt` into `./digest-out` and records nothing as sent, so every run shows the same jobs again.
+2. To send mail set `DIGEST_MODE=smtp`, `DIGEST_SMTP_HOST`, `DIGEST_SMTP_FROM` and `DIGEST_SMTP_TO` (one or more addresses). The password goes into `secrets/digest/smtp_password` (git-ignored; only that folder is mounted, read-only) or `DIGEST_SMTP_PASSWORD`. STARTTLS is required unless the host is `localhost`, `127.0.0.1` or `::1`; `DIGEST_SMTP_SSL=true` uses implicit TLS; `DIGEST_SMTP_ALLOW_PLAINTEXT=true` is an explicit opt-out and logs a warning.
+3. `docker compose up -d --build`
+
+What it does: on `DIGEST_CRON` (default `0 0 8 * * *`, container time zone, `-` turns it off) it scans scored jobs from its cursor, keeps those in `DIGEST_TIERS` (default STRONG,PARTIAL) that were not mailed yet, and sends at most `DIGEST_MAX_ITEMS` (50): STRONG first, then by interview chance (a heuristic), then newest. Jobs that did not fit stay for the next run. No qualifying job, no mail. The sent jobs and the scan cursor are recorded in schema `digest` in one transaction after the mail server accepted the mail. Delivery is at-least-once: a crash between the two can repeat a mail but never loses a job. An SMTP or scoring failure records nothing and the next run retries.
+
+Switching from dry-run to smtp: dry-run never records anything, so the first smtp run mails everything scored in the last 7 days (`digest.initial-lookback`) that qualifies, up to the limit per run.
+
+All job and model text is untrusted and escaped; links are only for http/https urls; there are no remote images; the subject has counts only.
+
+Health: `curl http://127.0.0.1:8083/actuator/health`. Reaching scoring from inside the container: `docker exec job-applier-digest curl -H "Host: scoring-service" http://scoring-service:8082/api/usage/today` (needs `curl` in the image; the digest startup log also reports whether scoring answers).

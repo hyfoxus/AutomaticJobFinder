@@ -7,6 +7,7 @@ COPY gradle gradle
 COPY apps/contracts apps/contracts
 COPY apps/ingestion-service apps/ingestion-service
 COPY apps/scoring-service/build.gradle apps/scoring-service/build.gradle
+COPY apps/digest-service/build.gradle apps/digest-service/build.gradle
 
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon :apps:ingestion-service:bootJar -x test

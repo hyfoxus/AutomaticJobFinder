@@ -19,6 +19,7 @@ import com.gnemirko.jobapplier.scoring.repository.IngestCursorRepository;
         "scoring.llm.prices[test-model].output-per-million=0.01",
         "scoring.budget.daily-usd=10.00",
         "scoring.budget.zone=UTC",
+        "scoring.api.allowed-hosts=localhost,127.0.0.1,scoring-service",
         "scoring.ingestion.cron=-",
         "scoring.ingestion.chunk-size=50",
         "scoring.ingestion.read-timeout=1s",

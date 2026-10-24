@@ -24,7 +24,7 @@ class StartupFailureTest {
     private static final String PROFILE = "src/test/resources/profile.test.yml";
 
     @Configuration
-    @EnableConfigurationProperties(ScoringProperties.class)
+    @EnableConfigurationProperties({ScoringProperties.class, com.gnemirko.jobapplier.scoring.config.ApiProperties.class})
     @Import(ScoringConfig.class)
     static class Base {
     }
@@ -133,6 +133,16 @@ class StartupFailureTest {
         new ApplicationContextRunner()
                 .withUserConfiguration(Base.class)
                 .run(ctx -> assertThat(ctx).hasNotFailed().doesNotHaveBean("profile"));
+    }
+
+    @Test
+    void badAllowedHostsFailFast() {
+        for (String bad : new String[] {"*", "a:8082"}) {
+            runner("scoring.api.allowed-hosts=" + bad).withUserConfiguration(WithModel.class).run(ctx -> {
+                assertThat(ctx).hasFailed();
+                assertThat(rootMessage(ctx.getStartupFailure())).contains("allowed-hosts");
+            });
+        }
     }
 
     @Test

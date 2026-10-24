@@ -9,3 +9,4 @@ HELP.md
 **/profile.yml
 config/
 secrets/
+**/digest-out/

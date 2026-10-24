@@ -66,6 +66,8 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-jobapplier}
       SCORING_INGESTION_BASE_URL: http://ingestion-service:8081
       SCORING_PROFILE_PATH: /app/config/profile.yml
+      # The digest service calls scoring by this name, so the host guard must accept it.
+      SCORING_API_ALLOWED_HOSTS: localhost,127.0.0.1,scoring-service
     volumes:
       - ./config:/app/config:ro
     depends_on:
@@ -75,6 +77,36 @@ services:
         condition: service_started
     ports:
       - "127.0.0.1:${SCORING_HTTP_PORT:-8082}:8082"
+    restart: unless-stopped
+    networks:
+      - monorepo-net
+
+  digest-service:
+    container_name: job-applier-digest
+    build:
+      context: .
+      dockerfile: apps/digest-service/Dockerfile
+    image: job-applier-digest:dev
+    env_file:
+      - path: ./apps/digest-service/.env
+        required: false
+    environment:
+      DB_URL: jdbc:postgresql://job-applier-db:5432/${POSTGRES_DB:-jobapplier}
+      DB_USERNAME: ${POSTGRES_USER:-jobapplier}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-jobapplier}
+      DIGEST_SCORING_BASE_URL: http://scoring-service:8082
+      DIGEST_OUT_DIR: /app/digest-out
+    volumes:
+      - ./digest-out:/app/digest-out
+      # Only the digest's own secret files (secrets/digest/smtp_password). Docker creates the folder if it is missing.
+      - ./secrets/digest:/run/secrets:ro
+    depends_on:
+      job-applier-db:
+        condition: service_healthy
+      scoring-service:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${DIGEST_HTTP_PORT:-8083}:8083"
     restart: unless-stopped
     networks:
       - monorepo-net

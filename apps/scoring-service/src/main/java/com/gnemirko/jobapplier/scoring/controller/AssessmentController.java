@@ -32,16 +32,56 @@ public class AssessmentController {
 
     private final AssessmentRepository assessments;
 
-    /** Newest first. {@code status} is optional and case-insensitive; {@code limit} is 1..200 (default 50). */
+    /**
+     * Newest first. {@code status} is optional and case-insensitive; {@code limit} is 1..200 (default 50).
+     * With {@code scoredSince} (ISO-8601 instant, kept to microseconds) the answer is SCORED rows only, oldest
+     * scored first ({@code scoredAt asc, id asc}), from that instant on; {@code afterId} skips ids up to it on rows
+     * scored at exactly that instant.
+     */
     @GetMapping
     public List<AssessmentView> list(@RequestParam(required = false) String status,
-                                     @RequestParam(required = false) String limit) {
+                                     @RequestParam(required = false) String limit,
+                                     @RequestParam(required = false) String scoredSince,
+                                     @RequestParam(required = false) String afterId) {
         int size = parseLimit(limit);
+        if (scoredSince != null) {
+            if (status != null && !status.isBlank() && parseStatus(status) != AssessmentStatus.SCORED) {
+                throw new BadRequestException("scoredSince only applies to status SCORED");
+            }
+            return assessments.findScoredAfter(parseSince(scoredSince), parseAfterId(afterId), PageRequest.of(0, size))
+                    .stream().map(AssessmentView::of).toList();
+        }
+        if (afterId != null) {
+            throw new BadRequestException("afterId needs scoredSince");
+        }
         Pageable page = PageRequest.of(0, size, Sort.by(Sort.Order.desc("firstSeenAt"), Sort.Order.desc("id")));
         Iterable<AssessmentEntity> rows = status == null || status.isBlank()
                 ? assessments.findAllBy(page)
                 : assessments.findByStatus(parseStatus(status), page);
         return java.util.stream.StreamSupport.stream(rows.spliterator(), false).map(AssessmentView::of).toList();
+    }
+
+    private static java.time.Instant parseSince(String raw) {
+        try {
+            return java.time.Instant.parse(raw.trim()).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        } catch (java.time.DateTimeException e) {
+            throw new BadRequestException("scoredSince must be an ISO-8601 instant such as 2026-01-01T00:00:00Z");
+        }
+    }
+
+    private static long parseAfterId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 0L;
+        }
+        try {
+            long id = Long.parseLong(raw.trim());
+            if (id < 0) {
+                throw new NumberFormatException();
+            }
+            return id;
+        } catch (NumberFormatException e) {
+            throw new BadRequestException("afterId must be a whole number, 0 or more");
+        }
     }
 
     private static int parseLimit(String raw) {

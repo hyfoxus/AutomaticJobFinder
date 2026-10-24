@@ -53,6 +53,7 @@ class FlywayIsolationTest {
             assertThat(count(st, "select count(*) from public.flyway_schema_history")).isEqualTo(publicBefore);
             assertThat(count(st, "select count(*) from scoring.flyway_schema_history where version = '1'")).isEqualTo(1);
             assertThat(count(st, "select count(*) from scoring.flyway_schema_history where version = '2'")).isEqualTo(1);
+            assertThat(count(st, "select max(version::int) from scoring.flyway_schema_history")).isEqualTo(3);
         }
     }
 

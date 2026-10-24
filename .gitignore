@@ -45,3 +45,6 @@ apps/*/.env
 profile.yml
 config/*
 !config/.gitkeep
+
+### Digest dry-run output ###
+digest-out/
