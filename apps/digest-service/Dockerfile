@@ -9,7 +9,7 @@ COPY apps/contracts apps/contracts
 COPY apps/digest-service apps/digest-service
 COPY apps/ingestion-service/build.gradle apps/ingestion-service/build.gradle
 COPY apps/scoring-service/build.gradle apps/scoring-service/build.gradle
-
+COPY apps/web-ui/build.gradle apps/web-ui/build.gradle
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon :apps:digest-service:bootJar -x test
 

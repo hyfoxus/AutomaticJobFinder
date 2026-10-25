@@ -6,8 +6,8 @@ usage() {
 Usage: scripts/setup.sh [--build]
 
 Creates apps/*/.env from each .env.sample when missing, then starts the stack
-with docker compose using apps/ingestion-service/.env for configuration (scoring and digest read their own .env;
-their ports are set with SCORING_HTTP_PORT and DIGEST_HTTP_PORT in your shell or the ingestion .env). Add --build to force image rebuilds.
+with docker compose using apps/ingestion-service/.env for configuration (scoring, digest and the web UI read their own .env;
+their ports are set with SCORING_HTTP_PORT, DIGEST_HTTP_PORT and UI_HTTP_PORT in your shell or the ingestion .env). Add --build to force image rebuilds.
 USAGE
 }
 
@@ -39,3 +39,5 @@ docker compose --env-file apps/ingestion-service/.env up -d $BUILD_FLAG
 echo "Ingestion health: http://127.0.0.1:${INGESTION_HTTP_PORT:-8081}/actuator/health"
 echo "Scoring health:   http://127.0.0.1:${SCORING_HTTP_PORT:-8082}/actuator/health"
 echo "Digest health:    http://127.0.0.1:${DIGEST_HTTP_PORT:-8083}/actuator/health"
+echo "Web UI health:    http://127.0.0.1:${UI_HTTP_PORT:-8084}/actuator/health"
+echo "Web UI:           http://127.0.0.1:${UI_HTTP_PORT:-8084}/ (off until UI_ENABLED=true in apps/web-ui/.env)"

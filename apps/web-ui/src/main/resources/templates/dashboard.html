@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobApplier</title>
+  <link rel="stylesheet" href="/ui.css">
+</head>
+<body>
+<nav><a href="/">Dashboard</a><a href="/assessments">Scored vacancies</a></nav>
+<h1>JobApplier</h1>
+
+<p class="banner" th:if="${view.scoringDown}">The scoring service is not answering. Some figures are missing.</p>
+<p class="banner" th:if="${message != null}" th:text="${message}">Message</p>
+
+<h2>Today</h2>
+<p>
+  Spent <strong th:text="'$' + ${view.spent}">$0</strong>
+  of <strong th:text="'$' + ${view.cap}">$1</strong>
+  (<span th:text="${view.budget}">within budget</span>),
+  <span th:text="${view.calls}">0</span> model calls.
+</p>
+
+<h2>Recent rows</h2>
+<p class="note">Counts cover the most recent rows only: <span th:text="${view.total}">0</span> read.</p>
+<table class="counts">
+  <tr th:each="c : ${view.counts}">
+    <td th:text="${c.label}">Label</td>
+    <td th:text="${c.value}">0</td>
+  </tr>
+</table>
+<p><a href="/assessments">See the scored vacancies</a></p>
+
+<h2>Scoring run</h2>
+<form method="post" action="/run">
+  <input type="hidden" name="_csrf" th:value="${csrf}">
+  <button type="submit">Start a scoring run</button>
+</form>
+<p class="note">Runs spend money against the daily cap. Clicks within a minute of each other are ignored.</p>
+</body>
+</html>

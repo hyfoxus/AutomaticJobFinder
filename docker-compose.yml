@@ -111,5 +111,26 @@ services:
     networks:
       - monorepo-net
 
+  web-ui:
+    container_name: job-applier-ui
+    build:
+      context: .
+      dockerfile: apps/web-ui/Dockerfile
+    image: job-applier-ui:dev
+    env_file:
+      - path: ./apps/web-ui/.env
+        required: false
+    environment:
+      UI_SCORING_BASE_URL: http://scoring-service:8082
+    depends_on:
+      scoring-service:
+        condition: service_started
+    ports:
+      # Loopback only: the page has a button that spends money and no login.
+      - "127.0.0.1:${UI_HTTP_PORT:-8084}:8084"
+    restart: unless-stopped
+    networks:
+      - monorepo-net
+
 volumes:
   job-applier-dbdata:

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scored vacancies</title>
+  <link rel="stylesheet" href="/ui.css">
+</head>
+<body>
+<nav><a href="/">Dashboard</a><a href="/assessments">Scored vacancies</a></nav>
+<h1>Vacancies</h1>
+
+<form method="get" action="/assessments">
+  <label>Status
+    <select name="status">
+      <option th:each="s : ${statuses}" th:value="${s.name()}" th:text="${s.name()}" th:selected="${s.name() == view.status}">SCORED</option>
+    </select>
+  </label>
+  <label>Tier
+    <select name="tier">
+      <option value="">any</option>
+      <option th:each="t : ${tiers}" th:value="${t.name()}" th:text="${t.name()}" th:selected="${t.name() == view.tier}">STRONG</option>
+    </select>
+  </label>
+  <button type="submit">Show</button>
+</form>
+
+<p class="banner" th:if="${view.scoringDown}">The scoring service is not answering.</p>
+<p th:if="${!view.scoringDown and view.rows.isEmpty()}">Nothing to show.</p>
+
+<div class="row" th:each="row : ${view.rows}">
+  <h3 th:text="${row.title}">Title</h3>
+  <p class="meta"><span th:text="${row.company}">Company</span> · <span th:text="${row.location}">Location</span></p>
+  <p>
+    <span class="tag" th:text="'status: ' + ${row.status}">status</span>
+    <span class="tag" th:text="'tier: ' + ${row.tier}">tier</span>
+    <span class="tag" th:text="'interview chance (heuristic): ' + ${row.chance}">chance</span>
+    <span class="tag" th:text="'must-haves met: ' + ${row.metCount}">met</span>
+  </p>
+  <p th:text="${row.reason}">Reason</p>
+  <div th:if="${!row.hardGaps.isEmpty()}">
+    <strong>Hard gaps</strong>
+    <ul class="gaps"><li th:each="g : ${row.hardGaps}" th:text="${g}">gap</li></ul>
+  </div>
+  <div th:if="${!row.learnableGaps.isEmpty()}">
+    <strong>Learnable gaps</strong>
+    <ul class="gaps"><li th:each="g : ${row.learnableGaps}" th:text="${g}">gap</li></ul>
+  </div>
+  <p class="note">
+    <span th:text="${row.timeLabel} + ' ' + ${row.time}">scored time</span>
+    <span th:if="${row.safeUrl != null}"> ·
+      <a th:href="${row.safeUrl}" rel="noopener noreferrer" referrerpolicy="no-referrer">open the posting</a>
+      (<span th:text="${row.urlHost}">host</span>)
+    </span>
+  </p>
+</div>
+
+<p class="pager">
+  <a th:if="${view.hasPrev}" th:href="@{/assessments(status=${view.status},tier=${view.tier},page=${view.page - 1})}">Previous</a>
+  <span class="note" th:text="'Page ' + ${view.page}">Page 0</span>
+  <a th:if="${view.hasNext}" th:href="@{/assessments(status=${view.status},tier=${view.tier},page=${view.page + 1})}">Next</a>
+</p>
+</body>
+</html>

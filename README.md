@@ -19,6 +19,10 @@ Self-hosted tool that scans job sources, scores vacancies against your profile w
 JobApplier/                       Monorepo root
 ├─ apps/
 │  ├─ contracts/                  Shared DTOs, no logic
+│  ├─ web-ui/                     Minimal local web UI over the scoring API (off by default, Thymeleaf, no JS)
+│  │  ├─ docker/entrypoint.sh     Starts the jar
+│  │  ├─ Dockerfile               Multi-stage build (context = repo root)
+│  │  └─ .env.sample              Template for service environment variables
 │  ├─ digest-service/             Emails a digest of newly scored vacancies (off by default)
 │  │  ├─ docker/entrypoint.sh     Secret loader used inside the runtime image
 │  │  ├─ Dockerfile               Multi-stage build (context = repo root)
@@ -89,7 +93,7 @@ Assessment text (`reason`, gap texts) is written by the model: escape it whereve
 
 Network notes: scoring and ingestion are published on loopback only. Ingestion stays reachable from the other containers on `monorepo-net` at `http://ingestion-service:8081`. A new module must be added to the other Dockerfiles' `COPY` lines (each copies only the other services' `build.gradle`).
 
-Scoring answers only to Host names on `scoring.api.allowed-hosts` (`SCORING_API_ALLOWED_HOSTS`, default `localhost,127.0.0.1`; compose adds `scoring-service` so the digest service can reach it). `GET /api/assessments` also takes `scoredSince` (ISO instant) and `afterId`: SCORED rows only, oldest scored first.
+Scoring answers only to Host names on `scoring.api.allowed-hosts` (`SCORING_API_ALLOWED_HOSTS`, default `localhost,127.0.0.1`; compose adds `scoring-service` so the digest service can reach it). `GET /api/assessments` also takes `scoredSince` (ISO instant) and `afterId`: SCORED rows only, oldest scored first. For the web UI it takes `tier` (STRONG, PARTIAL or WEAK; only with status SCORED or none) and `page` (0 or more; offset is `page * limit`, within the first 10000 rows, else 400), and answers with an `X-Has-More: true|false` header. Offset paging shifts when new rows arrive between two requests.
 
 ---
 
@@ -108,3 +112,18 @@ Switching from dry-run to smtp: dry-run never records anything, so the first smt
 All job and model text is untrusted and escaped; links are only for http/https urls; there are no remote images; the subject has counts only.
 
 Health: `curl http://127.0.0.1:8083/actuator/health`. Reaching scoring from inside the container: `docker exec job-applier-digest curl -H "Host: scoring-service" http://scoring-service:8082/api/usage/today` (needs `curl` in the image; the digest startup log also reports whether scoring answers).
+
+---
+
+## Web UI
+
+Off by default (`ui.enabled=false`): the container starts and reports healthy, with no pages. It needs scoring enabled, because every page is built from the scoring REST API; it has no database and no JavaScript.
+
+1. In `apps/web-ui/.env` set `UI_ENABLED=true`.
+2. `docker compose up -d --build`, then open `http://127.0.0.1:8084/` (`UI_HTTP_PORT` changes the port; it is published on loopback only).
+
+Pages: `/` shows today's spend against the cap, counts of the most recent 200 rows and a button that starts a scoring run (at most one accepted per minute; the daily cost cap in scoring still applies). `/assessments?status=&tier=&page=` lists rows, 50 per page, newest first; status defaults to SCORED, other values are whitelisted and anything else is 400. The interview chance is a heuristic. Offset paging can shift when new rows arrive.
+
+There is no login, so keep it on loopback. It answers only to the Host names in `UI_ALLOWED_HOSTS` (default `localhost,127.0.0.1`), sets a strict Content-Security-Policy and the other security headers on every response, shows job and model text as plain text only, and links a posting only when its url is plain http or https. The run button is the only write: it needs a CSRF token (cookie plus form field) and an Origin equal to the Host. If scoring is down the pages show a fixed notice, never the error text.
+
+Health: `curl http://127.0.0.1:8084/actuator/health`. Digest status is not shown yet.

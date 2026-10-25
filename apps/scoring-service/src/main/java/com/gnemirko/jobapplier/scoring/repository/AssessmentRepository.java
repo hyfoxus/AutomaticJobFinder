@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.gnemirko.jobapplier.scoring.dto.AssessmentStatus;
+import com.gnemirko.jobapplier.scoring.dto.Tier;
 import com.gnemirko.jobapplier.scoring.entity.AssessmentEntity;
 
 public interface AssessmentRepository extends JpaRepository<AssessmentEntity, Long> {
@@ -23,6 +24,12 @@ public interface AssessmentRepository extends JpaRepository<AssessmentEntity, Lo
 
     /** One page of rows with this status; the order comes from the pageable. */
     Slice<AssessmentEntity> findByStatus(AssessmentStatus status, Pageable pageable);
+
+    /** One page of rows with this status and tier; the order comes from the pageable. */
+    Slice<AssessmentEntity> findByStatusAndTier(AssessmentStatus status, Tier tier, Pageable pageable);
+
+    /** One page of rows with this tier, whatever the status; the order comes from the pageable. */
+    Slice<AssessmentEntity> findByTier(Tier tier, Pageable pageable);
 
     /** One page of all rows; the order comes from the pageable. */
     Slice<AssessmentEntity> findAllBy(Pageable pageable);
