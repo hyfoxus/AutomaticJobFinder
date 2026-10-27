@@ -25,6 +25,8 @@ public class FakeChatModel implements ChatModel {
     private final Deque<Object> script = new ArrayDeque<>();
     /** Runs at the start of every call, before the scripted answer. */
     public volatile java.util.function.Consumer<Prompt> onCall;
+    /** Finish reason put on the next generations; null leaves it unset. */
+    public volatile String finishReason;
     public int defaultInputTokens = 1000;
     public int defaultOutputTokens = 1000;
 
@@ -34,6 +36,7 @@ public class FakeChatModel implements ChatModel {
         defaultInputTokens = 1000;
         defaultOutputTokens = 1000;
         onCall = null;
+        finishReason = null;
     }
 
     public synchronized FakeChatModel reply(String text, Integer in, Integer out) {
@@ -70,7 +73,9 @@ public class FakeChatModel implements ChatModel {
             meta.usage(new DefaultUsage(r.in, r.out));
         }
         return ChatResponse.builder()
-                .generations(new ArrayList<>(List.of(new Generation(new AssistantMessage(r.text)))))
+                .generations(new ArrayList<>(List.of(finishReason == null ? new Generation(new AssistantMessage(r.text))
+                        : new Generation(new AssistantMessage(r.text),
+                                org.springframework.ai.chat.metadata.ChatGenerationMetadata.builder().finishReason(finishReason).build()))))
                 .metadata(meta.build())
                 .build();
     }

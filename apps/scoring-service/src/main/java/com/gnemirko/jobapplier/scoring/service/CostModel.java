@@ -58,6 +58,11 @@ public class CostModel {
         return costMicros(promptEstimateTokens, maxTokens);
     }
 
+    /** Most one call can cost with a caller-chosen output allowance. */
+    public long worstCaseMicros(long promptEstimateTokens, long maxOutputTokens) {
+        return costMicros(promptEstimateTokens, maxOutputTokens);
+    }
+
     private static long ceil(BigDecimal v) {
         return v.setScale(0, RoundingMode.CEILING).longValueExact();
     }

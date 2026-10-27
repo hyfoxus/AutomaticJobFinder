@@ -22,6 +22,7 @@ class ScoringApiDisabledTest {
     void endpointsAre404() throws Exception {
         mvc.perform(get("/api/assessments")).andExpect(status().isNotFound());
         mvc.perform(get("/api/usage/today")).andExpect(status().isNotFound());
+        mvc.perform(post("/api/llm/complete").header("X-JobApplier-Run", "1")).andExpect(status().isNotFound());
         mvc.perform(post("/api/scoring/run").header("X-JobApplier-Run", "1")).andExpect(status().isNotFound());
     }
 }

@@ -79,6 +79,40 @@ public class UsageLedger {
         return id == null ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(id);
     }
 
+    /** Why a learn reservation was refused. */
+    public enum LearnRefusal { CAP, LEARN_LIMIT }
+
+    /** Result of {@link #reserveLearn}: a reservation id, or the reason it was refused. */
+    public record LearnReservation(long id, LearnRefusal refusal) {
+        public boolean granted() {
+            return refusal == null;
+        }
+    }
+
+    /**
+     * Like {@link #reserve} for the recipe learner, with two more limits checked in the same transaction:
+     * the number of learn runs today (first calls; a retry is a second call of a run, so calls are held to
+     * twice the runs) and the learn-only spend.
+     */
+    public LearnReservation reserveLearn(String model, long worstCaseMicros, long capMicros, String jobKey,
+                                         boolean retry, int maxRuns, long learnCapMicros) {
+        return tx.execute(status -> {
+            lock();
+            LocalDate day = today();
+            if (repository.sumMicrosForDay(day) + worstCaseMicros > capMicros) {
+                return new LearnReservation(0, LearnRefusal.CAP);
+            }
+            boolean runsOut = retry ? repository.countLearnCalls(day) >= 2L * maxRuns
+                    : repository.countLearnRuns(day) >= maxRuns;
+            if (runsOut || repository.sumLearnMicros(day) + worstCaseMicros > learnCapMicros) {
+                return new LearnReservation(0, LearnRefusal.LEARN_LIMIT);
+            }
+            long id = repository.save(new LlmUsageEntity(clock.instant(), day, model, 0, 0, worstCaseMicros,
+                    true, jobKey)).getId();
+            return new LearnReservation(id, null);
+        });
+    }
+
     /** Replaces a reservation with the real usage. The real figure is stored even if it is above the reservation. */
     public void settle(long reservationId, long inputTokens, long outputTokens, long micros, boolean estimated) {
         tx.executeWithoutResult(status -> {

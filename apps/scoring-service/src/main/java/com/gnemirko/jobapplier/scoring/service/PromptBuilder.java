@@ -5,11 +5,7 @@ import java.util.List;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.anthropic.AnthropicChatOptions;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import com.gnemirko.jobapplier.contracts.JobPosting;
@@ -34,10 +30,7 @@ public class PromptBuilder {
     private final String systemText;
     private final int maxDescriptionChars;
     private final int maxTokens;
-    private final String model;
-    private final Double temperature;
-    private final boolean openAi;
-    private final boolean anthropic;
+    private final ChatOptionsFactory optionsFactory;
 
     /** Fixed allowance per message for role markers and provider framing. */
     static final int MESSAGE_OVERHEAD_TOKENS = 16;
@@ -47,13 +40,11 @@ public class PromptBuilder {
         return (chars + 1) / 2;
     }
 
-    public PromptBuilder(Profile profile, ScoringProperties props, FitAssessor assessor, Environment env) {
+    public PromptBuilder(Profile profile, ScoringProperties props, FitAssessor assessor,
+                         ChatOptionsFactory optionsFactory) {
         this.maxDescriptionChars = props.llm().maxDescriptionChars();
         this.maxTokens = props.llm().maxTokens();
-        this.model = props.llm().model();
-        this.temperature = props.llm().temperature();
-        this.openAi = "openai".equalsIgnoreCase(env.getProperty("spring.ai.model.chat", "none"));
-        this.anthropic = "anthropic".equalsIgnoreCase(env.getProperty("spring.ai.model.chat", "none"));
+        this.optionsFactory = optionsFactory;
         this.systemText = system(profile, assessor.formatInstructions());
     }
 
@@ -61,33 +52,8 @@ public class PromptBuilder {
         String user = user(job);
         List<Message> messages = List.of(new SystemMessage(systemText), new UserMessage(user));
         long chars = (long) systemText.length() + user.length();
-        return new BuiltPrompt(new Prompt(messages, options()),
+        return new BuiltPrompt(new Prompt(messages, optionsFactory.options(maxTokens)),
                 estimateTokens(chars) + 2L * MESSAGE_OVERHEAD_TOKENS);
-    }
-
-    /** OpenAI takes max-completion-tokens (max-tokens is rejected by newer models); others take max-tokens. */
-    private ChatOptions options() {
-        if (openAi) {
-            OpenAiChatOptions.Builder b = OpenAiChatOptions.builder().model(model).maxCompletionTokens(maxTokens);
-            if (temperature != null) {
-                b.temperature(temperature);
-            }
-            return b.build();
-        }
-        if (anthropic) {
-            // Thinking would spend the whole output cap and leave an empty reply.
-            AnthropicChatOptions.Builder b = AnthropicChatOptions.builder().model(model).maxTokens(maxTokens)
-                    .thinkingDisabled();
-            if (temperature != null) {
-                b.temperature(temperature);
-            }
-            return b.build();
-        }
-        ChatOptions.Builder<?> b = ChatOptions.builder().model(model).maxTokens(maxTokens);
-        if (temperature != null) {
-            b.temperature(temperature);
-        }
-        return b.build();
     }
 
     String user(JobPosting job) {

@@ -21,7 +21,7 @@ class FitAssessorTest {
     private final FakeChatModel model = new FakeChatModel();
     private final FitAssessor assessor = new FitAssessor(ChatClient.create(model), UnitSupport.profile());
     private final BuiltPrompt prompt = new PromptBuilder(UnitSupport.profile(), UnitSupport.props(1, 1, 500, "1"),
-            assessor, new org.springframework.mock.env.MockEnvironment()).build(posting("Dev", "Acme", "Remote", "desc"));
+            assessor, new ChatOptionsFactory(UnitSupport.props(1, 1, 500, "1"), new org.springframework.mock.env.MockEnvironment())).build(posting("Dev", "Acme", "Remote", "desc"));
 
     @Test
     void validReplyUsesProviderUsage() {

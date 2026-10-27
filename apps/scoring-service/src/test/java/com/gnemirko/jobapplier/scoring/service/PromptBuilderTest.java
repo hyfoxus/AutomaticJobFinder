@@ -13,7 +13,7 @@ import com.gnemirko.jobapplier.scoring.dto.BuiltPrompt;
 class PromptBuilderTest {
 
     private final PromptBuilder builder = new PromptBuilder(UnitSupport.profile(),
-            UnitSupport.props(1, 1, 500, "1"), new FitAssessor(ChatClient.create(new FakeChatModel()), UnitSupport.profile()), new MockEnvironment());
+            UnitSupport.props(1, 1, 500, "1"), new FitAssessor(ChatClient.create(new FakeChatModel()), UnitSupport.profile()), new ChatOptionsFactory(UnitSupport.props(1, 1, 500, "1"), new MockEnvironment()));
 
     @Test
     void systemMessageHoldsProfileWithNumberedMustHavesAndNoJobText() {
@@ -59,7 +59,7 @@ class PromptBuilderTest {
         MockEnvironment env = new MockEnvironment().withProperty("spring.ai.model.chat", "openai");
         FitAssessor fa = new FitAssessor(ChatClient.create(new FakeChatModel()), UnitSupport.profile());
         var o = (org.springframework.ai.openai.OpenAiChatOptions) new PromptBuilder(UnitSupport.profile(),
-                UnitSupport.props(1, 1, 500, "1"), fa, env).build(posting("t", "c", "l", "d")).prompt().getOptions();
+                UnitSupport.props(1, 1, 500, "1"), fa, new ChatOptionsFactory(UnitSupport.props(1, 1, 500, "1"), env)).build(posting("t", "c", "l", "d")).prompt().getOptions();
         assertThat(o.getMaxCompletionTokens()).isEqualTo(500);
         assertThat(o.getMaxTokens()).isNull();
         assertThat(o.getTemperature()).isNull();

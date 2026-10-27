@@ -48,3 +48,6 @@ config/*
 
 ### Digest dry-run output ###
 digest-out/
+
+### Recipe learner proposals (review folder) ###
+recipes-proposed/

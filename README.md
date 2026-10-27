@@ -127,3 +127,26 @@ Pages: `/` shows today's spend against the cap, counts of the most recent 200 ro
 There is no login, so keep it on loopback. It answers only to the Host names in `UI_ALLOWED_HOSTS` (default `localhost,127.0.0.1`), sets a strict Content-Security-Policy and the other security headers on every response, shows job and model text as plain text only, and links a posting only when its url is plain http or https. The run button is the only write: it needs a CSRF token (cookie plus form field) and an Origin equal to the Host. If scoring is down the pages show a fixed notice, never the error text.
 
 Health: `curl http://127.0.0.1:8084/actuator/health`. Digest status is not shown yet.
+
+---
+
+## Recipe learner
+
+Off by default (`INGESTION_LEARNER_ENABLED=false`): no learner code runs and `/api/learn` does not exist. When on, it asks the model for a recipe for one careers site, checks it, tries it on a small live sample and saves it **disabled** in `./recipes-proposed` (writable for ingestion only; never loaded, never inside `./recipes`). The model call goes through scoring (`POST /api/llm/complete`) and counts against the same daily cost cap, plus its own limits (3 learn runs and $0.25 a day by default, see `apps/scoring-service/.env.sample`).
+
+Adding a host, after you have reviewed its terms of use and robots.txt:
+
+1. Read the site's terms of use and its `robots.txt`. Only continue if automated reading of the job pages is allowed. The learner never bypasses robots.txt, bot challenges or a refusal.
+2. Run `scripts/setup.sh` once (or create `secrets/learner/token` yourself, at least 16 characters). Ingestion and scoring both mount this file, and it must exist before `docker compose up`: if it is missing Docker creates a directory of that name, which `scripts/setup.sh` detects and refuses (remove the directory and run it again). Scoring has no learn endpoint without the file. Scoring must be enabled with a provider.
+3. In `apps/ingestion-service/.env` set `INGESTION_LEARNER_ENABLED=true` and add the exact host name to `INGESTION_LEARNER_ALLOWED_HOSTS` (comma separated, no scheme, no subdomain wildcard; listing a host is your record that you reviewed it). Then `docker compose up -d --build`.
+4. Start a run (one at a time, loopback only; the answer is 202 with a run id, 409 if busy, 400 if the host is not listed):
+
+   ```bash
+   curl -X POST -H "X-JobApplier-Run: 1" -H "Content-Type: application/json" \
+        -d '{"url": "https://careers.example.com/jobs"}' http://127.0.0.1:8081/api/learn
+   ```
+
+5. Read `recipes-proposed/<name>.report.txt` (outcome, strategy, sample titles, notes). On success `<name>.json` sits next to it with `"enabled": false`. Existing files are never overwritten; a clash adds a numeric suffix.
+6. Review the recipe, move it to `./recipes`, set `"enabled": true`, and restart ingestion (recipes load once at startup).
+
+Outcomes you may see in the report: no fitting strategy (the site needs a JSON API or JavaScript that none of the three strategies cover), blocked by robots.txt or a bot challenge, budget reached, model unavailable, or no valid recipe after two model calls. A timeout or a server error is never retried. Page text sent to the model is a reduced, capped skeleton and is treated as data; the reply is parsed only into the recipe schema and every URL in it must be on the host you started from.

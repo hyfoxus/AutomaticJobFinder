@@ -14,4 +14,13 @@ public interface LlmUsageRepository extends JpaRepository<LlmUsageEntity, Long> 
     long sumMicrosForDay(@Param("day") LocalDate day);
 
     long countByDay(LocalDate day);
+
+    @Query("select count(u) from LlmUsageEntity u where u.day = :day and u.jobKey like '@learn:%' and u.jobKey not like '%#retry'")
+    long countLearnRuns(@Param("day") LocalDate day);
+
+    @Query("select count(u) from LlmUsageEntity u where u.day = :day and u.jobKey like '@learn:%'")
+    long countLearnCalls(@Param("day") LocalDate day);
+
+    @Query("select coalesce(sum(u.micros), 0) from LlmUsageEntity u where u.day = :day and u.jobKey like '@learn:%'")
+    long sumLearnMicros(@Param("day") LocalDate day);
 }

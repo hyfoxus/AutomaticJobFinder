@@ -34,6 +34,19 @@ done
 # The digest service mounts these read-only (optional secret files such as secrets/digest/smtp_password).
 mkdir -p secrets/digest digest-out
 
+# Recipe learner: the review folder (ingestion writes proposed recipes here) and the secret shared by ingestion and
+# scoring. The token is created once; delete the file to rotate it. Without the file Docker would make a folder.
+mkdir -p recipes-proposed secrets/learner
+if [ -d secrets/learner/token ]; then
+  echo "secrets/learner/token is a directory (Docker made it because the file was missing at 'docker compose up')." >&2
+  echo "Stop the stack, remove it with: rmdir secrets/learner/token   and run this script again." >&2
+  exit 1
+fi
+if [ ! -s secrets/learner/token ]; then
+  (umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > secrets/learner/token)
+  echo "Created secrets/learner/token"
+fi
+
 # --env-file makes the values in apps/ingestion-service/.env reach compose interpolation.
 docker compose --env-file apps/ingestion-service/.env up -d $BUILD_FLAG
 echo "Ingestion health: http://127.0.0.1:${INGESTION_HTTP_PORT:-8081}/actuator/health"

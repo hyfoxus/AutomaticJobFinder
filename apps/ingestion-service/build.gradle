@@ -31,4 +31,8 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // The recipe learner tests talk to a local HTTPS stub whose self-signed certificate is trusted only here.
+    systemProperty 'javax.net.ssl.trustStore', file('src/test/resources/learner-stub-truststore.p12').absolutePath
+    systemProperty 'javax.net.ssl.trustStorePassword', 'changeit'
+    systemProperty 'javax.net.ssl.trustStoreType', 'PKCS12'
 }

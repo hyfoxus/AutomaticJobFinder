@@ -21,6 +21,21 @@ public class ApiErrorAdvice {
         return json(e.getMessage());
     }
 
+    @ExceptionHandler(com.gnemirko.jobapplier.scoring.exception.LearnForbiddenException.class)
+    ResponseEntity<Map<String, String>> learnForbidden(Exception e) {
+        return json(HttpStatus.FORBIDDEN, "forbidden");
+    }
+
+    @ExceptionHandler(com.gnemirko.jobapplier.scoring.exception.PayloadTooLargeException.class)
+    ResponseEntity<Map<String, String>> tooLarge(Exception e) {
+        return json(HttpStatus.PAYLOAD_TOO_LARGE, e.getMessage());
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    ResponseEntity<Map<String, String>> unreadable(Exception e) {
+        return json("invalid request body");
+    }
+
     @ExceptionHandler({org.springframework.web.bind.ServletRequestBindingException.class,
             org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
     ResponseEntity<Map<String, String>> binding(Exception e) {

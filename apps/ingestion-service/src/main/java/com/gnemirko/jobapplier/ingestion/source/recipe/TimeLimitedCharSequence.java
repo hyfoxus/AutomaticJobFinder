@@ -5,9 +5,9 @@ import lombok.RequiredArgsConstructor;
 
 /** Wraps a string so a regex match throws once its time limit passes (guards against backtracking blow-ups). */
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-final class TimeLimitedCharSequence implements CharSequence {
+public final class TimeLimitedCharSequence implements CharSequence {
 
-    static final class MatchTimeoutException extends RuntimeException {
+    public static final class MatchTimeoutException extends RuntimeException {
         MatchTimeoutException() {
             super("regex match exceeded its time limit", null, false, false);
         }
@@ -16,7 +16,7 @@ final class TimeLimitedCharSequence implements CharSequence {
     private final CharSequence inner;
     private final long deadlineNanos;
 
-    static TimeLimitedCharSequence limited(CharSequence inner, long limitNanos) {
+    public static TimeLimitedCharSequence limited(CharSequence inner, long limitNanos) {
         return new TimeLimitedCharSequence(inner, System.nanoTime() + limitNanos);
     }
 
