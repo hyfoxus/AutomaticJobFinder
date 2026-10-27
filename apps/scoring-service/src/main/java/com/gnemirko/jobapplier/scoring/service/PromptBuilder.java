@@ -7,6 +7,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -36,6 +37,7 @@ public class PromptBuilder {
     private final String model;
     private final Double temperature;
     private final boolean openAi;
+    private final boolean anthropic;
 
     /** Fixed allowance per message for role markers and provider framing. */
     static final int MESSAGE_OVERHEAD_TOKENS = 16;
@@ -51,6 +53,7 @@ public class PromptBuilder {
         this.model = props.llm().model();
         this.temperature = props.llm().temperature();
         this.openAi = "openai".equalsIgnoreCase(env.getProperty("spring.ai.model.chat", "none"));
+        this.anthropic = "anthropic".equalsIgnoreCase(env.getProperty("spring.ai.model.chat", "none"));
         this.systemText = system(profile, assessor.formatInstructions());
     }
 
@@ -66,6 +69,15 @@ public class PromptBuilder {
     private ChatOptions options() {
         if (openAi) {
             OpenAiChatOptions.Builder b = OpenAiChatOptions.builder().model(model).maxCompletionTokens(maxTokens);
+            if (temperature != null) {
+                b.temperature(temperature);
+            }
+            return b.build();
+        }
+        if (anthropic) {
+            // Thinking would spend the whole output cap and leave an empty reply.
+            AnthropicChatOptions.Builder b = AnthropicChatOptions.builder().model(model).maxTokens(maxTokens)
+                    .thinkingDisabled();
             if (temperature != null) {
                 b.temperature(temperature);
             }
