@@ -50,6 +50,13 @@ public class SitemapRecipeJobSource implements JobSource {
                 ? Pattern.compile(idFrom.substring(Recipe.ID_URL_REGEX_PREFIX.length())) : null;
     }
 
+    private volatile java.util.List<String> diagnostics = java.util.List.of();
+
+    /** Why pages of the last fetch were skipped, plus counts; for the recipe learner's report only. */
+    public java.util.List<String> diagnostics() {
+        return diagnostics;
+    }
+
     @Override
     public String name() {
         return recipe.name();
@@ -59,7 +66,8 @@ public class SitemapRecipeJobSource implements JobSource {
     public FetchResult fetch(FetchContext context) {
         Instant deadline = clock.instant().plus(maxRun);
         Recipe.Sitemap sitemap = recipe.sitemap();
-        SitemapReader.Result listed = reader.read(URI.create(sitemap.url()), urlPattern, sitemap.maxUrls());
+        SitemapReader.Result listed = reader.read(URI.create(sitemap.url()), urlPattern, sitemap.maxUrls(),
+                sitemap.keepQuery());
         List<String> notes = new ArrayList<>(listed.notes());
 
         Map<String, Instant> known = context.knownJobs();
@@ -136,6 +144,11 @@ public class SitemapRecipeJobSource implements JobSource {
         if (step.robotsSkipped() > 0) {
             notes.add(step.robotsSkipped() + " page(s) disallowed by robots.txt");
         }
+        List<String> diag = new ArrayList<>();
+        diag.add("urlPattern matched " + listed.entries().size() + " sitemap URL(s); " + listed.fetchCount()
+                + " eligible for fetching under maxUrls=" + sitemap.maxUrls());
+        diag.addAll(step.skipReasons());
+        diagnostics = List.copyOf(diag);
         log.info("Recipe '{}': collected={} unchanged={} skipped={} detailFetches={}", name(), postings.size(),
                 unchanged.size(), step.skipped(), step.detailFetches());
         return new FetchResult(postings, step.skipped(), unchanged, notes.isEmpty() ? null : String.join("; ", notes));

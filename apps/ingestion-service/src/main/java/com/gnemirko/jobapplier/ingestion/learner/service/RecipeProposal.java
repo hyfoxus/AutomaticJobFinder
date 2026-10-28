@@ -149,7 +149,7 @@ public final class RecipeProposal {
         if (sitemap != null) {
             requireTargetHost(sitemap.url(), target, "sitemap.url");
             Integer max = sitemap.maxUrls() == null ? null : Math.min(sitemap.maxUrls(), MAX_SITEMAP_URLS);
-            sitemap = new Recipe.Sitemap(sitemap.url(), sitemap.urlPattern(), max);
+            sitemap = new Recipe.Sitemap(sitemap.url(), sitemap.urlPattern(), max, sitemap.keepQuery());
         }
         Recipe.Detail detail = r.detail();
         if (detail != null && detail.embeddedJson() != null) {

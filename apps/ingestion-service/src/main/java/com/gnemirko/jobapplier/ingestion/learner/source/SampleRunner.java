@@ -55,12 +55,20 @@ public class SampleRunner {
     /** A blocked response ({@link FetchBlockedException}) is not caught: the run must stop. */
     public Sample run(Recipe recipe) {
         List<String> notes = new ArrayList<>();
+        java.util.function.Supplier<List<String>> diagnostics = List::of;
         Recipe copy = clampedCopy(recipe);
         FetchResult result;
         try {
-            JobSource source = Recipe.STRATEGY_SITEMAP.equals(recipe.strategy())
-                    ? new SitemapRecipeJobSource(copy, fetcher, new SitemapReader(fetcher), clock, maxRun)
-                    : new RecipeJobSource(copy, fetcher, clock, maxRun);
+            JobSource source;
+            if (Recipe.STRATEGY_SITEMAP.equals(recipe.strategy())) {
+                SitemapRecipeJobSource s = new SitemapRecipeJobSource(copy, fetcher, new SitemapReader(fetcher), clock, maxRun);
+                diagnostics = s::diagnostics;
+                source = s;
+            } else {
+                RecipeJobSource s = new RecipeJobSource(copy, fetcher, clock, maxRun);
+                diagnostics = s::diagnostics;
+                source = s;
+            }
             if (Recipe.STRATEGY_SITEMAP.equals(recipe.strategy())) {
                 notes.add("sitemap sample: at most " + SAMPLE_SITEMAP_URLS + " matching URLs are kept, but the engine still reads"
                         + " the sitemap and up to " + SitemapReader.MAX_CHILDREN + " child sitemap files in full");
@@ -71,6 +79,9 @@ public class SampleRunner {
         } catch (RuntimeException e) {
             notes.add("sample run failed: " + Text.clean(e.getMessage(), 300));
             return new Sample(false, false, 0, List.of(), notes);
+        }
+        for (String d : diagnostics.get()) {
+            notes.add("sample: " + Text.clean(d, 300));
         }
         if (result.note() != null) {
             notes.add(Text.clean(result.note(), 300));
@@ -98,7 +109,7 @@ public class SampleRunner {
         }
         Recipe.Sitemap s = r.sitemap();
         if (s != null) {
-            s = new Recipe.Sitemap(s.url(), s.urlPattern(), Math.min(SAMPLE_SITEMAP_URLS, s.maxUrls()));
+            s = new Recipe.Sitemap(s.url(), s.urlPattern(), Math.min(SAMPLE_SITEMAP_URLS, s.maxUrls()), s.keepQuery());
         }
         return new Recipe(r.name(), false, r.strategy(), l, s, r.workday(), r.detail(), limits);
     }

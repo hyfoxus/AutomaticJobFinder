@@ -21,7 +21,7 @@ final class EmbeddedJsonExtractor implements DetailExtractor {
         EmbeddedJsonParser.Outcome out = parser.parse(doc);
         return switch (out.kind()) {
             case EXPIRED -> Result.EXPIRED;
-            case BAD -> Result.BAD;
+            case BAD -> Result.bad("embedded JSON missing or id/title not extracted");
             case OK -> {
                 EmbeddedJsonParser.Parsed p = out.parsed();
                 yield new Result(new JobPosting(p.id(), sourceName, p.title(), p.company(), p.location(),

@@ -260,6 +260,7 @@ public class RecipeLearner {
             report.strategy = accepted.recipe().strategy();
             if (!sample.ran()) {
                 sample.notes().forEach(report::note);
+                report.note("attempt " + call + " proposed recipe: " + compact(accepted.json()));
                 report.note("the sample run could not fetch the site; no second model call was made");
                 return Outcome.FETCH_FAILED;
             }
@@ -267,6 +268,7 @@ public class RecipeLearner {
             report.titles = sample.titles();
             sample.notes().forEach(report::note);
             if (!sample.passed()) {
+                report.note("attempt " + call + " proposed recipe: " + compact(accepted.json()));
                 report.note("attempt " + call + " sample run found " + sample.good() + " usable postings (need "
                         + SampleRunner.MIN_GOOD + ")");
                 feedback = "a sample run of that recipe found only " + sample.good()
@@ -283,6 +285,15 @@ public class RecipeLearner {
             return Outcome.PROPOSED;
         }
         return last;
+    }
+
+    /** The clamped, re-serialised recipe (never the raw reply) on one line, cleaned and capped. */
+    private static String compact(String json) {
+        try {
+            return Text.clean(new tools.jackson.databind.json.JsonMapper().readTree(json).toString(), 4000);
+        } catch (RuntimeException e) {
+            return "(not shown)";
+        }
     }
 
     private byte[] fetchRobots(URI target) {
@@ -314,7 +325,7 @@ public class RecipeLearner {
         }
 
         void note(String s) {
-            notes.add(Text.clean(s, 400));
+            notes.add(Text.clean(s, s.contains("proposed recipe: ") ? 4100 : 400));
         }
 
         String render() {

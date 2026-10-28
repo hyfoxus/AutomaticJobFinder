@@ -50,10 +50,16 @@ public record Recipe(String name, Boolean enabled, String strategy, Listing list
         }
     }
 
-    public record Sitemap(String url, String urlPattern, Integer maxUrls) {
+    /** {@code keepQuery}: keep the query string of job URLs (for sites whose job id is in it); default false. */
+    public record Sitemap(String url, String urlPattern, Integer maxUrls, Boolean keepQuery) {
 
         public Sitemap {
             maxUrls = maxUrls == null ? DEFAULT_MAX_URLS : maxUrls;
+            keepQuery = keepQuery != null && keepQuery;
+        }
+
+        public Sitemap(String url, String urlPattern, Integer maxUrls) {
+            this(url, urlPattern, maxUrls, null);
         }
     }
 

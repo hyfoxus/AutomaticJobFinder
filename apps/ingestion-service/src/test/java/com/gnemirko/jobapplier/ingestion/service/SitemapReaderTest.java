@@ -80,6 +80,17 @@ class SitemapReaderTest {
     }
 
     @Test
+    void keepQueryKeepsJobUrlsThatDifferOnlyByQuery() {
+        xml("/sitemap.xml", urlset(entry(url("/jobs/detail?id=1"), null), entry(url("/jobs/detail?id=2"), null),
+                entry(url("/jobs/detail?id=3"), null), entry("https://elsewhere.example/jobs/detail?id=4", null)));
+        var kept = reader.read(stub.uri("/sitemap.xml"), ANY, 100, true);
+        assertThat(kept.entries()).extracting(e -> e.url().toString()).containsExactly(
+                url("/jobs/detail?id=1"), url("/jobs/detail?id=2"), url("/jobs/detail?id=3"));
+        var dropped = reader.read(stub.uri("/sitemap.xml"), ANY, 100);
+        assertThat(dropped.entries()).extracting(e -> e.url().toString()).containsExactly(url("/jobs/detail"));
+    }
+
+    @Test
     void plainSitemapIsFilteredCanonicalisedAndDeduped() {
         xml("/sitemap.xml", urlset(
                 entry(url("/jobs/a?x=1#f"), "2026-10-01T10:20:30.999Z"),

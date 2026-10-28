@@ -82,6 +82,11 @@ public class SitemapReader {
      * @param urlPattern job URLs must match (found anywhere in the canonical URL)
      */
     public Result read(URI root, Pattern urlPattern, int maxUrls) {
+        return read(root, urlPattern, maxUrls, false);
+    }
+
+    /** {@code keepQuery} applies to job URLs only; the host and scheme checks are the same either way. */
+    public Result read(URI root, Pattern urlPattern, int maxUrls, boolean keepQuery) {
         timeoutWarned = false;
         URI canonicalRoot = UrlCanonicalizer.canonicalize(root, false);
         if (canonicalRoot == null) {
@@ -153,7 +158,7 @@ public class SitemapReader {
             if (r.loc() == null) {
                 continue;
             }
-            URI canonical = UrlCanonicalizer.canonicalize(URI.create(r.loc()), false);
+            URI canonical = UrlCanonicalizer.canonicalize(URI.create(r.loc()), keepQuery);
             if (canonical == null || !sameSite(canonical, host, scheme)) {
                 continue;
             }

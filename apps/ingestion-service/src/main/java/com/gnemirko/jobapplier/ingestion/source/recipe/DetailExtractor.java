@@ -12,9 +12,18 @@ import com.gnemirko.jobapplier.contracts.JobPosting;
 interface DetailExtractor {
 
     /** {@code expired} marks a page that is valid but closed; it is counted apart from bad pages. */
-    record Result(JobPosting posting, boolean expired) {
-        static final Result BAD = new Result(null, false);
-        static final Result EXPIRED = new Result(null, true);
+    record Result(JobPosting posting, boolean expired, String reason) {
+        static final Result BAD = new Result(null, false, null);
+        static final Result EXPIRED = new Result(null, true, null);
+
+        Result(JobPosting posting, boolean expired) {
+            this(posting, expired, null);
+        }
+
+        /** An unusable page with a fixed category, for diagnostics only. */
+        static Result bad(String reason) {
+            return new Result(null, false, reason);
+        }
     }
 
     Result extract(Document page, URI link, Instant updatedAt);

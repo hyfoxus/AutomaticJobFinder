@@ -61,7 +61,9 @@ public class CompletionService {
             "linkSelector": "a[href]" (a CSS selector for the links), "linkPattern": "<Java regex matched against the absolute job URL>"}. \
             Block "detail" is required.
             2. "sitemap": job URLs are listed in an XML sitemap. Block "sitemap": {"url": "https://HOST/sitemap.xml", \
-            "urlPattern": "<Java regex matched against each URL>", "maxUrls": 1..5000}. Block "detail" is required.
+            "urlPattern": "<Java regex matched against each URL>", "maxUrls": 1..5000, "keepQuery": true (optional boolean)}. \
+Block "detail" is required. Set keepQuery to true when the job URLs listed in the sitemap contain a query string that \
+identifies the job (for example .../jobdetails?id=R123); otherwise omit it.
             Detail block, one of:
             - {"extractor": "json-ld", "idFrom": "jsonld"} or {"extractor": "json-ld", "idFrom": "urlRegex:<regex with exactly one group>"}: \
             the job page carries a schema.org JobPosting in JSON-LD.

@@ -30,12 +30,15 @@ final class JsonLdExtractor implements DetailExtractor {
     public Result extract(Document doc, URI link, Instant updatedAt) {
         Optional<JsonLdJobPostingParser.Parsed> parsed = JsonLdJobPostingParser.parse(doc);
         if (parsed.isEmpty()) {
-            return Result.BAD;
+            return Result.bad("no JobPosting found");
         }
         JsonLdJobPostingParser.Parsed p = parsed.get();
         String id = idPattern == null ? p.identifier() : idFromUrl(link.toString());
-        if (id == null || id.isBlank() || p.title() == null) {
-            return Result.BAD;
+        if (id == null || id.isBlank()) {
+            return Result.bad("id not extracted");
+        }
+        if (p.title() == null) {
+            return Result.bad("missing title");
         }
         return new Result(new JobPosting(id.strip(), sourceName, p.title(), p.company(), p.location(),
                 link.toString(), p.description(), p.postedAt(), null, p.jobType(), null, updatedAt), false);

@@ -51,6 +51,18 @@ class RecipeProposalTest {
     }
 
     @Test
+    void sitemapKeepQueryIsAcceptedAndKeptInTheSavedJson() {
+        String base = "{\"strategy\":\"sitemap\",\"sitemap\":{\"url\":\"https://careers.example.com/sitemap.xml\","
+                + "\"urlPattern\":\"/jobdetails[?]id=\",\"keepQuery\":true},"
+                + "\"detail\":{\"extractor\":\"json-ld\",\"idFrom\":\"urlRegex:id=([A-Za-z0-9_]+)\"}}";
+        var r = parse(base);
+        assertThat(r).isInstanceOf(Accepted.class);
+        assertThat(((Accepted) r).recipe().sitemap().keepQuery()).isTrue();
+        assertThat(((Accepted) r).json()).contains("\"keepQuery\" : true");
+        assertThat(parse(base.replace("true", "\"yes\""))).isInstanceOf(Rejected.class);
+    }
+
+    @Test
     void noneIsNoStrategy() {
         assertThat(parse("{\"strategy\":\"none\"}")).isInstanceOf(NoStrategy.class);
         assertThat(parse("  {\"strategy\": \"none\"}\n")).isInstanceOf(NoStrategy.class);

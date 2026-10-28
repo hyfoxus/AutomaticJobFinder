@@ -212,6 +212,22 @@ class RecipeLearnerTest {
     }
 
     @Test
+    void failedSampleReportShowsRecipeAndWhyPagesWereSkipped() throws Exception {
+        site.standardCareers(4);
+        for (int i = 1; i <= 4; i++) {
+            site.ok("/jobs/" + i, "<html><body>no structured data</body></html>");
+        }
+        site.routes.put("/jobs/4", new StubSite.Route(404, "gone"));
+        scoring.reply(site.goodReply()).reply(site.goodReply());
+        LearnStarted s = run(learner());
+        String report = report(s);
+        assertThat(report).contains("proposed recipe: {\"name\":\"127-0-0-1\"", "\"enabled\":false",
+                "127.0.0.1/jobs/1: no JobPosting found",
+                "/jobs/4: fetch failed with status 404");
+        assertThat(report).doesNotContain("whatever");
+    }
+
+    @Test
     void fewerThanThreePostingsFails() throws Exception {
         site.standardCareers(2);
         scoring.reply(site.goodReply()).reply(site.goodReply());

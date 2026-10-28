@@ -147,6 +147,7 @@ Adding a host, after you have reviewed its terms of use and robots.txt:
    ```
 
 5. Read `recipes-proposed/<name>.report.txt` (outcome, strategy, sample titles, notes). On success `<name>.json` sits next to it with `"enabled": false`. Existing files are never overwritten; a clash adds a numeric suffix.
+   Sitemap recipes may set `"keepQuery": true` in the `sitemap` block when the job id lives in the URL query (for example `...?id=R123`); the default drops the query, as before.
 6. Review the recipe, move it to `./recipes`, set `"enabled": true`, and restart ingestion (recipes load once at startup).
 
 Outcomes you may see in the report: no fitting strategy (the site needs a JSON API or JavaScript that none of the three strategies cover), blocked by robots.txt or a bot challenge, budget reached, model unavailable, or no valid recipe after two model calls. A timeout or a server error is never retried. Page text sent to the model is a reduced, capped skeleton and is treated as data; the reply is parsed only into the recipe schema and every URL in it must be on the host you started from.

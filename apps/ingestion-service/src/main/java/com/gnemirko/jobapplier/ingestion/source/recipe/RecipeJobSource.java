@@ -68,6 +68,13 @@ public class RecipeJobSource implements JobSource {
         this.recipeScheme = first.getScheme().toLowerCase(java.util.Locale.ROOT);
     }
 
+    private volatile java.util.List<String> diagnostics = java.util.List.of();
+
+    /** Why pages of the last fetch were skipped, plus counts; for the recipe learner's report only. */
+    public java.util.List<String> diagnostics() {
+        return diagnostics;
+    }
+
     @Override
     public String name() {
         return recipe.name();
@@ -132,6 +139,7 @@ public class RecipeJobSource implements JobSource {
                 }
             }
         }
+        diagnostics = step.skipReasons();
         log.info("Recipe '{}': collected={} unchanged={} skipped={} detailFetches={}", name(), postings.size(),
                 unchanged.size(), step.skipped(), step.detailFetches());
         return new FetchResult(postings, step.skipped(), unchanged, note);

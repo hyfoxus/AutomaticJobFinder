@@ -49,6 +49,10 @@ final class DetailStep {
     private int failed;
     private int bad;
     private int robotsSkipped;
+    private final java.util.List<String> skipReasons = new java.util.ArrayList<>();
+
+    /** At most this many "url: reason" entries are kept for diagnostics. */
+    static final int MAX_SKIP_REASONS = 10;
 
     /** The HTML path: pages fetched as-is and parsed with jsoup for the extractor. */
     DetailStep(PoliteFetcher fetcher, String sourceName, DetailExtractor extractor, int cap) {
@@ -90,6 +94,19 @@ final class DetailStep {
 
     int detailFetches() {
         return detailFetches;
+    }
+
+    /** Bounded list of "host/path?query: category" for pages that were skipped; diagnostics only. */
+    java.util.List<String> skipReasons() {
+        return java.util.List.copyOf(skipReasons);
+    }
+
+    private void why(URI link, String reason) {
+        if (skipReasons.size() < MAX_SKIP_REASONS) {
+            String q = link.getRawQuery();
+            skipReasons.add(link.getHost() + (link.getRawPath() == null ? "" : link.getRawPath())
+                    + (q == null ? "" : "?" + q) + ": " + reason);
+        }
     }
 
     int skipped() {
@@ -134,12 +151,14 @@ final class DetailStep {
             log.debug("Recipe '{}': {} disallowed by robots.txt", sourceName, link);
             requested = false;
             robotsSkipped++;
+            why(link, "disallowed by robots.txt");
         } catch (FetchBlockedException e) {
             throw e;
         } catch (FetchException e) {
             log.warn("Recipe '{}': detail {} failed: {}", sourceName, link, e.getMessage());
             failure = e;
             failed++;
+            why(link, "fetch failed (transport or server error)");
         }
         if (requested) {
             detailFetches++;
@@ -154,10 +173,16 @@ final class DetailStep {
         if (page != null && page.status() / 100 == 2) {
             DetailExtractor.Result r = reader.read(page, link, updatedAt);
             posting = r.posting();
+            if (posting == null && !r.expired()) {
+                why(link, r.reason() == null ? "no usable posting" : r.reason());
+            }
             if (r.expired()) {
                 lastExpired = true;
                 expired++;
             }
+        }
+        if (page != null && page.status() / 100 != 2) {
+            why(link, "fetch failed with status " + page.status());
         }
         if (posting == null) {
             skipped++;
