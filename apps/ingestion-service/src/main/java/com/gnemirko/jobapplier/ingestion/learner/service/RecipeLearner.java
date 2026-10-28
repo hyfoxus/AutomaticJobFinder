@@ -121,6 +121,15 @@ public class RecipeLearner {
         return busy.get();
     }
 
+    /** The single run slot, shared with the clone run: true when it was free and is now taken. */
+    public boolean tryAcquireSlot() {
+        return busy.compareAndSet(false, true);
+    }
+
+    public void releaseSlot() {
+        busy.set(false);
+    }
+
     /**
      * Checks the URL and the allow-list (nothing is fetched before they pass), claims the single run slot and the
      * output name, and starts the run in the background.

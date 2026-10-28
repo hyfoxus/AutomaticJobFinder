@@ -51,6 +51,12 @@ public class SitemapRecipeJobSource implements JobSource {
     }
 
     private volatile java.util.List<String> diagnostics = java.util.List.of();
+    private volatile int matched = -1;
+
+    /** How many sitemap URLs matched the pattern in the last fetch (-1 before any fetch); for the learner only. */
+    public int matched() {
+        return matched;
+    }
 
     /** Why pages of the last fetch were skipped, plus counts; for the recipe learner's report only. */
     public java.util.List<String> diagnostics() {
@@ -68,6 +74,7 @@ public class SitemapRecipeJobSource implements JobSource {
         Recipe.Sitemap sitemap = recipe.sitemap();
         SitemapReader.Result listed = reader.read(URI.create(sitemap.url()), urlPattern, sitemap.maxUrls(),
                 sitemap.keepQuery());
+        matched = listed.entries().size();
         List<String> notes = new ArrayList<>(listed.notes());
 
         Map<String, Instant> known = context.knownJobs();

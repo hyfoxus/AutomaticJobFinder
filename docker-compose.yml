@@ -46,6 +46,8 @@ services:
       INGESTION_LEARNER_ALLOWED_HOSTS: ${INGESTION_LEARNER_ALLOWED_HOSTS-}
       INGESTION_LEARNER_SCORING_BASE_URL: ${INGESTION_LEARNER_SCORING_BASE_URL:-http://scoring-service:8082}
       INGESTION_LEARNER_OUTPUT_DIR: /app/recipes-proposed
+      INGESTION_LEARNER_MAX_CLONES: ${INGESTION_LEARNER_MAX_CLONES:-80}
+      INGESTION_LEARNER_CLONE_MAX_RUN: ${INGESTION_LEARNER_CLONE_MAX_RUN:-30m}
     volumes:
       - ./recipes:/app/recipes:ro
       # Review folder for proposed recipes: writable for ingestion only. Nothing here is ever loaded.

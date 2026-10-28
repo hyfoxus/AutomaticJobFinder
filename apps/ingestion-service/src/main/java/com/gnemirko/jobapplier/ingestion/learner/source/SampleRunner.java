@@ -39,7 +39,12 @@ public class SampleRunner {
 
     /** @param ran false when the run itself failed (fetch or transport error), as opposed to finding too few postings
      * @param notes remarks for the report, including the bound of a sitemap read */
-    public record Sample(boolean ran, boolean passed, int good, List<String> titles, List<String> notes) {
+    public record Sample(boolean ran, boolean passed, int good, List<String> titles, List<String> notes,
+            int matched, List<String> ids) {
+
+        public Sample(boolean ran, boolean passed, int good, List<String> titles, List<String> notes) {
+            this(ran, passed, good, titles, notes, -1, List.of());
+        }
     }
 
     private final PoliteFetcher fetcher;
@@ -56,6 +61,7 @@ public class SampleRunner {
     public Sample run(Recipe recipe) {
         List<String> notes = new ArrayList<>();
         java.util.function.Supplier<List<String>> diagnostics = List::of;
+        java.util.function.IntSupplier matched = () -> -1;
         Recipe copy = clampedCopy(recipe);
         FetchResult result;
         try {
@@ -63,6 +69,7 @@ public class SampleRunner {
             if (Recipe.STRATEGY_SITEMAP.equals(recipe.strategy())) {
                 SitemapRecipeJobSource s = new SitemapRecipeJobSource(copy, fetcher, new SitemapReader(fetcher), clock, maxRun);
                 diagnostics = s::diagnostics;
+                matched = s::matched;
                 source = s;
             } else {
                 RecipeJobSource s = new RecipeJobSource(copy, fetcher, clock, maxRun);
@@ -78,7 +85,7 @@ public class SampleRunner {
             throw e;
         } catch (RuntimeException e) {
             notes.add("sample run failed: " + Text.clean(e.getMessage(), 300));
-            return new Sample(false, false, 0, List.of(), notes);
+            return new Sample(false, false, 0, List.of(), notes, matched.getAsInt(), List.of());
         }
         for (String d : diagnostics.get()) {
             notes.add("sample: " + Text.clean(d, 300));
@@ -87,17 +94,21 @@ public class SampleRunner {
             notes.add(Text.clean(result.note(), 300));
         }
         List<String> titles = new ArrayList<>();
+        List<String> ids = new ArrayList<>();
         int good = 0;
         for (JobPosting p : result.postings()) {
             if (p.title() != null && !p.title().isBlank() && p.url() != null && !p.url().isBlank()) {
                 good++;
+                if (p.externalId() != null) {
+                    ids.add(p.externalId());
+                }
                 if (titles.size() < MAX_TITLES) {
                     titles.add(Text.clean(p.title(), 120));
                 }
             }
         }
         notes.add("sample fetched " + result.postings().size() + " postings, " + good + " with title and url");
-        return new Sample(true, good >= MIN_GOOD, good, titles, notes);
+        return new Sample(true, good >= MIN_GOOD, good, titles, notes, matched.getAsInt(), ids);
     }
 
     static Recipe clampedCopy(Recipe r) {

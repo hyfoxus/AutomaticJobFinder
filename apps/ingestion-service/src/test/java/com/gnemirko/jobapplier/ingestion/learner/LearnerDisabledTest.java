@@ -35,6 +35,10 @@ class LearnerDisabledTest {
         assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.ingestion.learner.source.LlmClient.class)).isEmpty();
         mvc.perform(post("/api/learn").header("X-JobApplier-Run", "1").contentType("application/json")
                 .content("{\"url\":\"https://example.com/\"}")).andExpect(status().isNotFound());
+        assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.ingestion.learner.service.RecipeCloner.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(com.gnemirko.jobapplier.ingestion.learner.config.CloneProperties.class)).isEmpty();
+        mvc.perform(post("/api/clone").header("X-JobApplier-Run", "1").contentType("application/json")
+                .content("{\"template\":\"x\",\"indexUrl\":\"https://example.com/\"}")).andExpect(status().isNotFound());
         mvc.perform(get("/api/jobs")).andExpect(status().isOk());
     }
 

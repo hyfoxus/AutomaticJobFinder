@@ -175,6 +175,30 @@ public class SitemapReader {
         return new Result(entries, Math.min(entries.size(), maxUrls), notes);
     }
 
+    /** The root of a sitemap index: its final URL and every raw {@code <loc>} (blank ones as null), no child fetched. */
+    public record IndexListing(URI finalUri, List<String> locs) {
+    }
+
+    /**
+     * Fetches only {@code root} and lists the raw {@code <loc>} values of a sitemap index. A {@code urlset} root is not
+     * an index and throws. Nothing in the entries is fetched or filtered here.
+     */
+    public IndexListing readIndex(URI root) {
+        FetchedPage page = fetcher.fetch(root, fetcher.maxSitemapBytes());
+        if (page.status() / 100 != 2) {
+            throw new FetchException("Sitemap index " + root + " returned " + page.status());
+        }
+        Parsed parsed = parse(page);
+        if (!parsed.index()) {
+            throw new FetchException("Not a sitemap index: " + root + " is a plain sitemap");
+        }
+        List<String> locs = new ArrayList<>();
+        for (Raw r : parsed.entries()) {
+            locs.add(r.loc());
+        }
+        return new IndexListing(page.finalUri(), locs);
+    }
+
     private static boolean sameSite(URI canonical, String host, String scheme) {
         return host.equals(UrlCanonicalizer.hostOf(canonical)) && scheme.equalsIgnoreCase(canonical.getScheme());
     }

@@ -16,7 +16,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * Guards the learn endpoint only: Host must be localhost or 127.0.0.1 (a DNS-rebinding page gets 403) and the header
+ * Guards the learn and clone endpoints only: Host must be localhost or 127.0.0.1 (a DNS-rebinding page gets 403) and the header
  * X-JobApplier-Run: 1 must be present (else 400). Other paths, such as /api/jobs for the scoring service, are untouched.
  */
 @Component
@@ -30,7 +30,8 @@ public class LearnGuardFilter extends OncePerRequestFilter {
         // Decoded and normalised like the dispatcher does, so /api/%6Cearn and /api/./learn cannot slip past.
         String path = org.springframework.util.StringUtils.cleanPath(
                 UrlPathHelper.defaultInstance.getPathWithinApplication(request));
-        return !path.toLowerCase(Locale.ROOT).startsWith("/api/learn");
+        String lower = path.toLowerCase(Locale.ROOT);
+        return !(lower.startsWith("/api/learn") || lower.startsWith("/api/clone"));
     }
 
     @Override

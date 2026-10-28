@@ -6,6 +6,6 @@ import org.springframework.context.annotation.Configuration;
 /** Registers the learner settings, only when the learner is switched on. */
 @Configuration
 @LearnerEnabled
-@EnableConfigurationProperties(LearnerProperties.class)
+@EnableConfigurationProperties({LearnerProperties.class, CloneProperties.class})
 public class LearnerConfig {
 }

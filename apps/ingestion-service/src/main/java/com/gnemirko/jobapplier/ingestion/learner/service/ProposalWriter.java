@@ -80,6 +80,48 @@ public class ProposalWriter {
         throw new IOException("no free output name for " + base);
     }
 
+    /** Claims a report-only name {@code <base>.report.txt} (numeric suffix on a clash) for a clone run. */
+    public synchronized Claim claimReport(String base) throws IOException {
+        Files.createDirectories(dir);
+        Path real = dir.toRealPath();
+        for (int i = 1; i < 1000; i++) {
+            String name = i == 1 ? base : base + "-" + i;
+            Path report = real.resolve(name + ".report.txt");
+            try {
+                Files.createFile(report);
+            } catch (FileAlreadyExistsException e) {
+                continue;
+            }
+            if (!report.toRealPath().getParent().equals(real)) {
+                throw new IOException("output path escapes the review folder");
+            }
+            return new Claim(name, real.resolve(name + ".json"), report);
+        }
+        throw new IOException("no free output name for " + base);
+    }
+
+    /** True when {@code <name>.json} is already in the review folder (a link counts). */
+    public boolean recipeExists(String name) {
+        return Files.exists(dir.resolve(name + ".json"), java.nio.file.LinkOption.NOFOLLOW_LINKS);
+    }
+
+    /** Creates {@code <name>.json} with CREATE_NEW; false when it exists already. Never overwrites. */
+    public synchronized boolean writeNewRecipe(String name, String json) throws IOException {
+        Files.createDirectories(dir);
+        Path real = dir.toRealPath();
+        Path file = real.resolve(name + ".json");
+        if (!file.getParent().equals(real)) {
+            throw new IOException("output path escapes the review folder");
+        }
+        try {
+            Files.writeString(file, json + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE);
+            return true;
+        } catch (FileAlreadyExistsException e) {
+            return false;
+        }
+    }
+
     /** Removes the empty report file of a claim whose run never started. */
     public void discard(Claim claim) {
         try {

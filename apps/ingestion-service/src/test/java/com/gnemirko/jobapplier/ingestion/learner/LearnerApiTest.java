@@ -85,6 +85,24 @@ class LearnerApiTest {
                     r.setServerName("evil.example.com");
                     return r;
                 })).andExpect(status().isForbidden());
+        // The clone endpoint sits behind the same guard.
+        String clone = "{\"template\":\"nope\",\"indexUrl\":\"" + SITE.base() + "/sitemap-index.xml\"}";
+        mvc.perform(post("/api/clone").contentType("application/json").content(clone))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/clone").header("X-JobApplier-Run", "1").contentType("application/json").content(clone)
+                .with(r -> {
+                    r.setServerName("evil.example.com");
+                    return r;
+                })).andExpect(status().isForbidden());
+        mvc.perform(post(java.net.URI.create("/api/%63lone")).header("X-JobApplier-Run", "1")
+                .contentType("application/json").content(clone).with(r -> {
+                    r.setServerName("evil.example.com");
+                    return r;
+                })).andExpect(status().isForbidden());
+        mvc.perform(post(java.net.URI.create("/api/./clone")).contentType("application/json").content(clone))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/clone").header("X-JobApplier-Run", "1").contentType("application/json").content(clone))
+                .andExpect(status().isBadRequest());
         assertThat(SITE.hits).isEmpty();
         // The scoring service reads /api/jobs under the Host ingestion-service; the learner guard must not touch it.
         mvc.perform(get("/api/jobs").with(r -> {

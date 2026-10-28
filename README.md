@@ -138,7 +138,7 @@ Adding a host, after you have reviewed its terms of use and robots.txt:
 
 1. Read the site's terms of use and its `robots.txt`. Only continue if automated reading of the job pages is allowed. The learner never bypasses robots.txt, bot challenges or a refusal.
 2. Run `scripts/setup.sh` once (or create `secrets/learner/token` yourself, at least 16 characters). Ingestion and scoring both mount this file, and it must exist before `docker compose up`: if it is missing Docker creates a directory of that name, which `scripts/setup.sh` detects and refuses (remove the directory and run it again). Scoring has no learn endpoint without the file. Scoring must be enabled with a provider.
-3. In `apps/ingestion-service/.env` set `INGESTION_LEARNER_ENABLED=true` and add the exact host name to `INGESTION_LEARNER_ALLOWED_HOSTS` (comma separated, no scheme, no subdomain wildcard; listing a host is your record that you reviewed it). Then `docker compose up -d --build`.
+3. In the **root** `.env` (next to `docker-compose.yml`; compose reads these variables from there, `apps/ingestion-service/.env` does not override them) set `INGESTION_LEARNER_ENABLED=true` and add the exact host name to `INGESTION_LEARNER_ALLOWED_HOSTS` (comma separated, no scheme, no subdomain wildcard; listing a host is your record that you reviewed it). Then `docker compose up -d --build`.
 4. Start a run (one at a time, loopback only; the answer is 202 with a run id, 409 if busy, 400 if the host is not listed):
 
    ```bash
@@ -151,3 +151,18 @@ Adding a host, after you have reviewed its terms of use and robots.txt:
 6. Review the recipe, move it to `./recipes`, set `"enabled": true`, and restart ingestion (recipes load once at startup).
 
 Outcomes you may see in the report: no fitting strategy (the site needs a JSON API or JavaScript that none of the three strategies cover), blocked by robots.txt or a bot challenge, budget reached, model unavailable, or no valid recipe after two model calls. A timeout or a server error is never retried. Page text sent to the model is a reduced, capped skeleton and is treated as data; the reply is parsed only into the recipe schema and every URL in it must be on the host you started from.
+
+### Cloning a recipe to every country
+
+A sitemap recipe covers one locale. Once one recipe works (for example `recipes/accenture-ie-en.json`, the template), `POST /api/clone` copies it to every sibling locale in the site's sitemap index, sample-tests each copy and saves the passing ones **disabled** in `./recipes-proposed`. No model call and no scoring cost. It needs the learner switched on, the host in `INGESTION_LEARNER_ALLOWED_HOSTS` and the template loaded (in `./recipes`, enabled or not).
+
+```bash
+curl -X POST -H "X-JobApplier-Run: 1" -H "Content-Type: application/json" \
+     -d '{"template": "accenture-ie-en", "indexUrl": "https://www.accenture.com/sitemap-index.xml"}' \
+     http://127.0.0.1:8081/api/clone
+```
+
+The answer is 202 (409 if a learn or clone run is active, 400 for an unknown or non-locale-specific template or an index on another host). Siblings are index entries whose URL equals the template's sitemap URL with only the first path segment changed. Each clone is named after the template with its locale replaced (`accenture-ie-en` gives `accenture-de-de`). Expect about 6 requests per locale at the site's pacing (plus about 6 more once for a sample of the template locale), so roughly 15 minutes for 54 locales; limits: 80 locales and 30 minutes per run (`INGESTION_LEARNER_MAX_CLONES`, up to 120, and `INGESTION_LEARNER_CLONE_MAX_RUN`), 2 clone runs a day (a third answers 400).
+
+Read `recipes-proposed/<template>-clone.report.txt`: it lists every index entry as COVERED (sample passed, file written), FAILED (with the reason) or SKIPPED (not a sibling, already proposed, cap, time budget), and the counts add up to the index size. A locale passes when its sitemap has at least one matching URL and at least min(3, matched) sampled pages give a title and URL. Existing files are never overwritten, so a rerun resumes (already proposed entries are skipped). Then review the files you want, move them to `./recipes`, set `"enabled": true` and restart ingestion. Things to check first: the same job may appear in several locales under different ids and be scored twice (the report shows how many sample ids a locale shares with the template), and many enabled recipes mean many more detail fetches per cron run (the 100-per-recipe limit spreads them over several runs). `recipes/accenture-ie-en.json` stays untracked until you decide to commit it.
+

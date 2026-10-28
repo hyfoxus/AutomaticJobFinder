@@ -48,6 +48,11 @@ public final class RecipeProposal {
             .enable(SerializationFeature.INDENT_OUTPUT)
             .build();
 
+    /** The one way a recipe is turned into file text: the clamped record, never copied text. */
+    public static String serialize(Recipe recipe) {
+        return WRITER.writeValueAsString(recipe);
+    }
+
     public sealed interface Result permits Accepted, NoStrategy, Rejected {
     }
 
@@ -127,7 +132,7 @@ public final class RecipeProposal {
                 throw new Refused(e.getMessage(), FB_VALIDATION);
             }
             probePatterns(locked, target);
-            return new Accepted(locked, WRITER.writeValueAsString(locked));
+            return new Accepted(locked, serialize(locked));
         } catch (Refused e) {
             return new Rejected(shorten(e.getMessage()), e.feedback);
         } catch (RuntimeException e) {
