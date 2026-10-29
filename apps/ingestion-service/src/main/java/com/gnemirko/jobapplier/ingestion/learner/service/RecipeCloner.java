@@ -27,6 +27,7 @@ import com.gnemirko.jobapplier.ingestion.learner.config.CloneProperties;
 import com.gnemirko.jobapplier.ingestion.learner.config.LearnerEnabled;
 import com.gnemirko.jobapplier.ingestion.learner.config.LearnerProperties;
 import com.gnemirko.jobapplier.ingestion.learner.dto.CloneStarted;
+import com.gnemirko.jobapplier.ingestion.learner.dto.ProfileCountries;
 import com.gnemirko.jobapplier.ingestion.learner.exception.LearnBusyException;
 import com.gnemirko.jobapplier.ingestion.learner.exception.LearnRejectedException;
 import com.gnemirko.jobapplier.ingestion.learner.source.SampleRunner;
@@ -66,6 +67,13 @@ public class RecipeCloner {
         final String locale;
         Status status = Status.PENDING;
         String detail = "";
+        /** Auto-enable outcome (ENABLED, not in profile, cap, ...); null when auto-enable is off or not decided. */
+        String mark;
+        /** The tested clone and its name, kept for the auto-enable step. */
+        Recipe clone;
+        String name;
+        /** The proposal file existed before this run and was re-sampled because the country is listed. */
+        boolean reSampled;
 
         Line(String loc, String locale) {
             this.loc = loc;
@@ -87,6 +95,7 @@ public class RecipeCloner {
     private final SampleRunner sampler;
     private final ProposalWriter writer;
     private final RecipeLearner learner;
+    private final CountrySelector selector;
     private final Clock clock;
     private final Executor executor;
     private final ExecutorService owned;
@@ -96,14 +105,22 @@ public class RecipeCloner {
     @Autowired
     public RecipeCloner(LearnerProperties props, CloneProperties cloneProps, RecipeRegistry registry,
             RecipeValidator validator, PoliteFetcher fetcher, UrlPolicy policy, SampleRunner sampler,
-            ProposalWriter writer, RecipeLearner learner, Clock clock) {
-        this(props, cloneProps, registry, validator, fetcher, policy, sampler, writer, learner, clock, null);
+            ProposalWriter writer, RecipeLearner learner, Clock clock, CountrySelector selector) {
+        this(props, cloneProps, registry, validator, fetcher, policy, sampler, writer, learner, clock, selector, null);
+    }
+
+    /** Without auto-enable (no profile reader). */
+    public RecipeCloner(LearnerProperties props, CloneProperties cloneProps, RecipeRegistry registry,
+            RecipeValidator validator, PoliteFetcher fetcher, UrlPolicy policy, SampleRunner sampler,
+            ProposalWriter writer, RecipeLearner learner, Clock clock, Executor executor) {
+        this(props, cloneProps, registry, validator, fetcher, policy, sampler, writer, learner, clock, null, executor);
     }
 
     /** With an executor the caller owns (tests pass a direct one); without, a single daemon thread. */
     public RecipeCloner(LearnerProperties props, CloneProperties cloneProps, RecipeRegistry registry,
             RecipeValidator validator, PoliteFetcher fetcher, UrlPolicy policy, SampleRunner sampler,
-            ProposalWriter writer, RecipeLearner learner, Clock clock, Executor executor) {
+            ProposalWriter writer, RecipeLearner learner, Clock clock, CountrySelector selector, Executor executor) {
+        this.selector = selector;
         this.props = props;
         this.cloneProps = cloneProps;
         this.registry = registry;
@@ -259,6 +276,7 @@ public class RecipeCloner {
         final List<Line> lines = new ArrayList<>();
         final List<String> notes = new ArrayList<>();
         String outcome = "running";
+        boolean autoOn;
 
         Report(String runId, Plan plan) {
             this.runId = runId;
@@ -292,8 +310,18 @@ public class RecipeCloner {
             if (pending > 0) {
                 sb.append("PENDING: ").append(pending).append('\n');
             }
-            sb.append("Files are disabled proposals: review them, move them into the recipes folder, set"
-                    + " \"enabled\": true and restart ingestion.\n");
+            if (autoOn) {
+                java.util.Map<String, Integer> marks = new java.util.TreeMap<>();
+                lines.stream().filter(l -> l.mark != null).forEach(l -> marks.merge(l.mark, 1, Integer::sum));
+                sb.append("auto-enable: ON (ENABLED is a sub-mark of COVERED)\n");
+                marks.forEach((k, v) -> sb.append("  ").append(k).append(": ").append(v).append('\n'));
+                sb.append("ENABLED entries were written enabled into the auto folder and become active after an"
+                        + " ingestion restart (not before). Other COVERED files are disabled proposals: review them,"
+                        + " move them into the recipes folder, set \"enabled\": true and restart ingestion.\n");
+            } else {
+                sb.append("Files are disabled proposals: review them, move them into the recipes folder, set"
+                        + " \"enabled\": true and restart ingestion.\n");
+            }
             sb.append("notes:\n");
             notes.forEach(n -> sb.append("  - ").append(Text.clean(n, 400)).append('\n'));
             sb.append("entries:\n");
@@ -307,6 +335,9 @@ public class RecipeCloner {
                 sb.append("  ").append(l.status).append(' ').append(Text.clean(l.loc, 200));
                 if (!l.detail.isEmpty()) {
                     sb.append(" : ").append(Text.clean(l.detail, 300));
+                }
+                if (l.mark != null) {
+                    sb.append(" [").append(l.mark).append(']');
                 }
                 sb.append('\n');
             }
@@ -433,6 +464,21 @@ public class RecipeCloner {
             return;
         }
 
+        boolean autoOn = selector != null && cloneProps.autoEnable();
+        report.autoOn = autoOn;
+        ProfileCountries wanted = ProfileCountries.none("auto-enable is off");
+        Set<String> listed = Set.of();
+        Set<String> alreadyCountries = new HashSet<>();
+        if (autoOn) {
+            wanted = selector.load();
+            listed = new HashSet<>(wanted.codes());
+            if (!wanted.usable()) {
+                report.notes.add("auto-enable: nothing is enabled: " + wanted.problem());
+            } else {
+                report.notes.add("auto-enable: countries from the profile: " + String.join(", ", wanted.codes()));
+            }
+        }
+
         boolean blocked = false;
         java.util.Set<String> templateIds = new HashSet<>();
         try {
@@ -447,36 +493,72 @@ public class RecipeCloner {
         }
         int tried = 0;
         boolean interrupted = false;
-        for (Line s : siblings) {
+        List<Line> ordered = new ArrayList<>(siblings);
+        if (autoOn && wanted.usable()) {
+            // Listed countries first, so the time budget and the clone cap are not spent on others (stable sort).
+            final Set<String> want = listed;
+            ordered.sort(java.util.Comparator.comparingInt(
+                    (Line l) -> want.contains(CountrySelector.countryOf(l.locale)) ? 0 : 1));
+        }
+        for (Line s : ordered) {
             if (blocked) {
                 s.set(Status.SKIPPED, "run stopped: host blocked");
+                s.mark = skipMark(autoOn, s, listed, "not tested: host blocked");
                 continue;
             }
             if (interrupted || Thread.currentThread().isInterrupted()) {
                 interrupted = true;
                 s.set(Status.SKIPPED, "interrupted");
+                s.mark = skipMark(autoOn, s, listed, "not tested: interrupted");
                 continue;
             }
             String name = cloneName(template.name(), plan.templateLocale(), s.locale);
             if (name == null) {
                 s.set(Status.SKIPPED, "clone name invalid");
+                s.mark = skipMark(autoOn, s, listed, "not tested: invalid name");
                 continue;
             }
-            if (validator.isTaken(name)) {
+            s.name = name;
+            boolean inAuto = autoOn && writer.autoExists(name);
+            if (validator.isTaken(name) && !inAuto) {
                 s.set(Status.SKIPPED, "a recipe named " + name + " is already loaded");
+                s.mark = skipMark(autoOn, s, listed, "name taken");
+                continue;
+            }
+            if (inAuto) {
+                if (writer.autoLoadedEnabled(name)) {
+                    s.set(Status.SKIPPED, "already enabled");
+                    s.mark = skipMark(autoOn, s, listed, "already enabled");
+                    String c = CountrySelector.countryOf(s.locale);
+                    if (c != null) {
+                        alreadyCountries.add(c);
+                    }
+                } else {
+                    s.set(Status.SKIPPED, "the file in the auto folder is not a valid enabled recipe");
+                    s.mark = skipMark(autoOn, s, listed, "invalid file present");
+                }
                 continue;
             }
             if (writer.recipeExists(name)) {
-                s.set(Status.SKIPPED, "already proposed");
-                continue;
+                String c = CountrySelector.countryOf(s.locale);
+                if (autoOn && c != null && listed.contains(c)) {
+                    // A listed country: test it again; the enabled copy is built from the template, not this file.
+                    s.reSampled = true;
+                } else {
+                    s.set(Status.SKIPPED, "already proposed");
+                    s.mark = skipMark(autoOn, s, listed, "already proposed");
+                    continue;
+                }
             }
             if (clock.instant().isAfter(started.plus(cloneProps.cloneMaxRun()))
                     || clock.instant().equals(started.plus(cloneProps.cloneMaxRun()))) {
                 s.set(Status.SKIPPED, "time budget");
+                s.mark = skipMark(autoOn, s, listed, "not tested: time budget");
                 continue;
             }
             if (tried >= cloneProps.maxClones()) {
                 s.set(Status.SKIPPED, "cap");
+                s.mark = skipMark(autoOn, s, listed, "not tested: clone cap");
                 continue;
             }
             Recipe clone = build(template, plan.templateLocale(), s.locale, name);
@@ -506,6 +588,113 @@ public class RecipeCloner {
             save(report, claim);
         }
         report.outcome = blocked ? "stopped: host blocked" : interrupted ? "interrupted" : "finished";
+        if (autoOn) {
+            List<Line> covered = siblings.stream().filter(l -> l.status == Status.COVERED && l.clone != null).toList();
+            if (Thread.currentThread().isInterrupted()) {
+                report.notes.add("auto-enable: interrupted, nothing was enabled");
+            } else {
+                enableMatching(covered, wanted, alreadyCountries, plan.templateLocale(), report);
+            }
+        }
+    }
+
+    /**
+     * The end step: enables passing clones of the profile's countries. Order of checks per clone: country unknown, not
+     * in profile, blocked, already enabled, same country already enabled, cap, host, write.
+     */
+    private void enableMatching(List<Line> covered, ProfileCountries wanted, Set<String> alreadyCountries,
+            String templateLocale, Report report) {
+        List<String> order = wanted.codes();
+        String templateLang = CountrySelector.languageOf(templateLocale);
+        List<Line> sorted = new ArrayList<>(covered);
+        sorted.sort(java.util.Comparator
+                .comparingInt((Line l) -> {
+                    int i = order.indexOf(CountrySelector.countryOf(l.locale));
+                    return i < 0 ? Integer.MAX_VALUE : i;
+                })
+                .thenComparingInt(l -> {
+                    String lang = CountrySelector.languageOf(l.locale);
+                    return lang.equals("en") ? 0 : lang.equals(templateLang) ? 1 : 2;
+                })
+                .thenComparing(l -> l.locale));
+        Set<String> done = new HashSet<>(alreadyCountries);
+        // Countries the site is already covered for: the template's own locale and every loaded recipe of this site
+        // (name = <base>-<country>-<language>), hand-written or auto.
+        String templateName = report.plan.template().name();
+        String base = templateName.endsWith("-" + templateLocale)
+                ? templateName.substring(0, templateName.length() - templateLocale.length() - 1) : templateName;
+        String own = CountrySelector.countryOf(templateLocale);
+        if (own != null) {
+            done.add(own);
+        }
+        for (Recipe r : registry.recipes()) {
+            if (r.enabled() && r.name().startsWith(base + "-")) {
+                String rest = r.name().substring(base.length() + 1);
+                String c = CountrySelector.countryOf(rest);
+                if (c != null && rest.matches("[a-z]{2}-[a-z0-9]{2,4}")) {
+                    done.add(c);
+                }
+            }
+        }
+        for (Line l : sorted) {
+            String country = CountrySelector.countryOf(l.locale);
+            if (country == null) {
+                l.mark = "country unknown";
+            } else if (!wanted.usable() || !order.contains(country)) {
+                l.mark = "not in profile";
+            } else if (cloneProps.isBlocked(l.name)) {
+                l.mark = "blocked";
+            } else if (writer.autoLoadedEnabled(l.name)) {
+                l.mark = "already enabled";
+                done.add(country);
+            } else if (done.contains(country)) {
+                l.mark = "same country already enabled";
+            } else if (writer.countAuto() >= cloneProps.maxAutoEnabled()) {
+                l.mark = "cap";
+            } else if (!hostAllowed(l.clone)) {
+                l.mark = "host not allowed";
+            } else {
+                try {
+                    if (writer.writeEnabled(l.clone, validator)) {
+                        l.mark = "ENABLED";
+                        done.add(country);
+                    } else {
+                        l.mark = "invalid file present";
+                    }
+                } catch (IOException | RuntimeException e) {
+                    log.warn("Clone run {} could not write an enabled recipe: {}", report.runId, e.toString());
+                    l.set(Status.FAILED, "could not write the enabled recipe: " + Text.clean(e.getMessage(), 200));
+                }
+            }
+        }
+    }
+
+    /** Mark order: country unknown, not in profile, blocked, then the given reason; null when auto-enable is off. */
+    private String skipMark(boolean autoOn, Line s, Set<String> listed, String reason) {
+        if (!autoOn) {
+            return null;
+        }
+        String c = CountrySelector.countryOf(s.locale);
+        if (c == null) {
+            return "country unknown";
+        }
+        if (!listed.contains(c)) {
+            return "not in profile";
+        }
+        return s.name != null && cloneProps.isBlocked(s.name) ? "blocked" : reason;
+    }
+
+    private boolean hostAllowed(Recipe clone) {
+        return hostAllowed(props, clone);
+    }
+
+    /** The clone's own host, checked against the allow-list right before a write. */
+    public static boolean hostAllowed(LearnerProperties props, Recipe clone) {
+        try {
+            return clone.sitemap() != null && props.isAllowed(URI.create(clone.sitemap().url()).getHost());
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     private void evaluate(Line s, SampleRunner.Sample sample, Recipe clone, String name, Set<String> templateIds) {
@@ -530,13 +719,22 @@ public class RecipeCloner {
         long shared = sample.ids().stream().filter(templateIds::contains).count();
         try {
             if (!writer.writeNewRecipe(name, RecipeProposal.serialize(clone))) {
-                s.set(Status.SKIPPED, "already proposed");
+                if (!s.reSampled) {
+                    s.set(Status.SKIPPED, "already proposed");
+                    return;
+                }
+                s.clone = clone;
+                s.name = name;
+                s.set(Status.COVERED, name + ".json (already proposed, tested again) " + counts
+                        + " sample-ids-shared-with-template=" + shared);
                 return;
             }
         } catch (IOException | RuntimeException e) {
             s.set(Status.FAILED, "could not write the recipe file: " + Text.clean(e.getMessage(), 200));
             return;
         }
+        s.clone = clone;
+        s.name = name;
         s.set(Status.COVERED, name + ".json " + counts + " sample-ids-shared-with-template=" + shared);
     }
 

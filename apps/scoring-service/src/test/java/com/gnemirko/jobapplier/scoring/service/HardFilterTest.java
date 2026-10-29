@@ -40,14 +40,14 @@ class HardFilterTest {
 
     @Test
     void emptyAllowedListMeansNoLocationFilter() {
-        Profile p = new Profile("s", java.util.List.of("a"), null, null, null);
+        Profile p = new Profile("s", java.util.List.of("a"), null, null, null, null);
         assertThat(new HardFilter(p).reject(posting("Dev", "Acme", "Mars", "d"))).isEmpty();
     }
 
     @Test
     void catastrophicRegexTimesOutAndRejectsFailClosed() {
         Profile p = new Profile("s", java.util.List.of("a"), null, null,
-                new Profile.Filters(java.util.List.of("(a+)+$"), null, null));
+                new Profile.Filters(java.util.List.of("(a+)+$"), null, null), null);
         String title = "a".repeat(5000) + "!";
         long start = System.nanoTime();
         assertThat(new HardFilter(p).reject(posting(title, "Acme", "Remote", "d"))).hasValueSatisfying(

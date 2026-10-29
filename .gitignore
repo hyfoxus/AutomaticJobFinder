@@ -51,3 +51,6 @@ digest-out/
 
 ### Recipe learner proposals (review folder) ###
 recipes-proposed/
+
+### Recipes enabled by a clone run (local) ###
+recipes-auto/

@@ -3,6 +3,7 @@ package com.gnemirko.jobapplier.ingestion.service;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -10,16 +11,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import org.jsoup.select.QueryParser;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.gnemirko.jobapplier.ingestion.dto.Recipe;
 import com.gnemirko.jobapplier.ingestion.entity.JobEntity;
+import com.gnemirko.jobapplier.ingestion.learner.config.LearnerProperties;
+import com.gnemirko.jobapplier.ingestion.learner.service.ProposalWriter;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
 import com.gnemirko.jobapplier.ingestion.source.recipe.EmbeddedJsonParser;
 
@@ -46,12 +51,87 @@ public class RecipeRegistry {
     private final List<Recipe> recipes;
 
     @Autowired
-    public RecipeRegistry(@Value("${ingestion.recipes.dir:./recipes}") String dir, List<JobSource> builtIns) {
-        this(Path.of(dir), builtIns.stream().map(JobSource::name).toList());
+    public RecipeRegistry(@Value("${ingestion.recipes.dir:./recipes}") String dir,
+            @Value("${ingestion.recipes.auto-dir:./recipes-auto}") String autoDir,
+            @Value("${ingestion.learner.output-dir:./recipes-proposed}") String proposedDir,
+            List<JobSource> builtIns, ObjectProvider<LearnerProperties> learner) {
+        this(Path.of(dir), Path.of(autoDir), Path.of(proposedDir), builtIns.stream().map(JobSource::name).toList(),
+                hostFilter(learner.getIfAvailable()));
     }
 
     public RecipeRegistry(Path dir, Collection<String> reservedNames) {
-        this.recipes = List.copyOf(load(dir, reservedNames));
+        this(dir, null, reservedNames, r -> true);
+    }
+
+    /**
+     * Loads {@code dir} first, then {@code autoDir} (the folder the clone run writes enabled recipes into). A name in
+     * both is an error that skips the auto one; an auto recipe the filter rejects is skipped.
+     */
+    public RecipeRegistry(Path dir, Path autoDir, Collection<String> reservedNames, Predicate<Recipe> autoFilter) {
+        this(dir, autoDir, null, reservedNames, autoFilter);
+    }
+
+    /** As above, also refusing any equality or nesting with the review folder (checked even when the learner is off). */
+    public RecipeRegistry(Path dir, Path autoDir, Path proposedDir, Collection<String> reservedNames,
+            Predicate<Recipe> autoFilter) {
+        Path r = ProposalWriter.canonical(dir);
+        if (autoDir != null) {
+            Path a = ProposalWriter.canonical(autoDir);
+            if (a.startsWith(r) || r.startsWith(a)) {
+                throw new IllegalStateException("ingestion.recipes.auto-dir (" + a
+                        + ") must not be, contain or sit inside the recipes folder (" + r + ")");
+            }
+            if (proposedDir != null) {
+                Path p = ProposalWriter.canonical(proposedDir);
+                if (a.startsWith(p) || p.startsWith(a)) {
+                    throw new IllegalStateException("ingestion.recipes.auto-dir (" + a
+                            + ") must not be, contain or sit inside the review folder (" + p + ")");
+                }
+            }
+        }
+        if (proposedDir != null) {
+            Path p = ProposalWriter.canonical(proposedDir);
+            if (p.startsWith(r) || r.startsWith(p)) {
+                throw new IllegalStateException("the review folder (" + p
+                        + ") must not be, contain or sit inside the recipes folder (" + r + ")");
+            }
+        }
+        Set<String> taken = new HashSet<>();
+        for (String n : reservedNames) {
+            taken.add(n.toLowerCase(Locale.ROOT));
+        }
+        List<Recipe> loaded = new ArrayList<>(load(dir, taken, false, x -> true));
+        if (autoDir != null) {
+            loaded.addAll(load(autoDir, taken, true, autoFilter));
+        }
+        this.recipes = List.copyOf(loaded);
+    }
+
+    private static Predicate<Recipe> hostFilter(LearnerProperties learner) {
+        if (learner == null) {
+            return r -> true;
+        }
+        return r -> {
+            String host = hostOf(r);
+            return host != null && learner.isAllowed(host);
+        };
+    }
+
+    private static String hostOf(Recipe r) {
+        try {
+            if (r.sitemap() != null) {
+                return URI.create(r.sitemap().url()).getHost();
+            }
+            if (r.listing() != null) {
+                return URI.create(r.listing().urlTemplate().replace("{page}", "1")).getHost();
+            }
+            if (r.workday() != null) {
+                return r.workday().host();
+            }
+        } catch (RuntimeException e) {
+            return null;
+        }
+        return null;
     }
 
     /** Valid recipes (enabled or not), in file-name order. */
@@ -59,19 +139,21 @@ public class RecipeRegistry {
         return recipes;
     }
 
-    private List<Recipe> load(Path dir, Collection<String> reservedNames) {
+    private List<Recipe> load(Path dir, Set<String> taken, boolean auto, Predicate<Recipe> accept) {
         List<Recipe> loaded = new ArrayList<>();
         if (!Files.isDirectory(dir)) {
-            log.info("Recipes directory {} not found; no recipe sources", dir);
+            if (auto) {
+                log.info("Auto recipes folder {} not found; nothing has been auto-enabled yet (not a problem)", dir);
+            } else {
+                log.info("Recipes directory {} not found; no recipe sources", dir);
+            }
             return loaded;
-        }
-        Set<String> taken = new HashSet<>();
-        for (String n : reservedNames) {
-            taken.add(n.toLowerCase(Locale.ROOT));
         }
         List<Path> files;
         try (Stream<Path> s = Files.list(dir)) {
-            files = s.filter(p -> p.getFileName().toString().endsWith(".json")).sorted().toList();
+            files = s.filter(p -> p.getFileName().toString().endsWith(".json"))
+                    // the auto folder is written by the service: only plain files, never links
+                    .filter(p -> !auto || Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS)).sorted().toList();
         } catch (IOException | RuntimeException e) {
             log.warn("Cannot list recipes directory {}: {}", dir, e.toString());
             return loaded;
@@ -80,6 +162,9 @@ public class RecipeRegistry {
             try {
                 Recipe recipe = mapper.readValue(Files.readString(file), Recipe.class);
                 validate(recipe);
+                if (auto && !accept.test(recipe)) {
+                    throw new IllegalArgumentException("host is not in ingestion.learner.allowed-hosts");
+                }
                 if (!taken.add(recipe.name().toLowerCase(Locale.ROOT))) {
                     throw new IllegalArgumentException("duplicate or reserved name '" + recipe.name() + "'");
                 }
@@ -93,7 +178,7 @@ public class RecipeRegistry {
     }
 
     /** Throws IllegalArgumentException describing the first problem found. */
-    static void validate(Recipe r) {
+    public static void validate(Recipe r) {
         if (r == null) {
             throw new IllegalArgumentException("empty recipe");
         }

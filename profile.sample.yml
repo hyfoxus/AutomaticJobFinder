@@ -38,3 +38,12 @@ filters:
   allowedLocationKeywords:
     - remote
     - europe
+
+# Optional. Countries whose cloned career-site recipes the ingestion service may enable by itself after a clone run
+# (INGESTION_LEARNER_AUTO_ENABLE=true; off by default). Two-letter country codes ("ie", "de", "uk" = "gb") and the
+# shortcuts "europe" (EU27 plus gb ch no is li ua rs ba me mk al md) and "eu" (EU27). Empty or missing enables
+# nothing; an unknown entry stops it. Only this field is read by ingestion. Scoring ignores it, so a listed country
+# must also pass allowedLocationKeywords above or its jobs are still filtered out.
+locationCountries:
+  - ie
+  - de

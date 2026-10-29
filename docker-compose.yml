@@ -39,6 +39,7 @@ services:
       INGESTION_REMOTIVE_CATEGORY: ${INGESTION_REMOTIVE_CATEGORY-software-dev}
       INGESTION_REMOTIVE_SEARCH: ${INGESTION_REMOTIVE_SEARCH-}
       INGESTION_RECIPES_DIR: ${INGESTION_RECIPES_DIR:-/app/recipes}
+      INGESTION_RECIPES_AUTO_DIR: /app/recipes-auto
       INGESTION_FETCH_MAX_RUN_DURATION: ${INGESTION_FETCH_MAX_RUN_DURATION:-20m}
       # Recipe learner: off by default. It reaches scoring by name; ingestion does not depend_on scoring (scoring
       # already depends on ingestion, and the learner only needs scoring when a run is started).
@@ -48,8 +49,18 @@ services:
       INGESTION_LEARNER_OUTPUT_DIR: /app/recipes-proposed
       INGESTION_LEARNER_MAX_CLONES: ${INGESTION_LEARNER_MAX_CLONES:-80}
       INGESTION_LEARNER_CLONE_MAX_RUN: ${INGESTION_LEARNER_CLONE_MAX_RUN:-30m}
+      # Auto-enable of cloned country recipes: off by default; reads only locationCountries from the profile.
+      INGESTION_LEARNER_AUTO_ENABLE: ${INGESTION_LEARNER_AUTO_ENABLE:-false}
+      INGESTION_LEARNER_MAX_AUTO_ENABLED: ${INGESTION_LEARNER_MAX_AUTO_ENABLED:-20}
+      INGESTION_LEARNER_AUTO_ENABLE_BLOCKED: ${INGESTION_LEARNER_AUTO_ENABLE_BLOCKED-}
+      INGESTION_LEARNER_PROFILE_FILE: /app/config/profile.yml
     volumes:
       - ./recipes:/app/recipes:ro
+      # Recipes enabled by a clone run for the profile's countries: writable for ingestion only. Always loaded;
+      # delete a file to disable that country.
+      - ./recipes-auto:/app/recipes-auto
+      # Only the locationCountries field is read from it, and only when auto-enable is on.
+      - ./config:/app/config:ro
       # Review folder for proposed recipes: writable for ingestion only. Nothing here is ever loaded.
       - ./recipes-proposed:/app/recipes-proposed
       # Same shared secret as scoring's (secrets/learner/token); sent as X-Learner-Token.
