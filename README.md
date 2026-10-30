@@ -130,6 +130,18 @@ Health: `curl http://127.0.0.1:8084/actuator/health`. Digest status is not shown
 
 ---
 
+## Recipe health
+
+After every source run ingestion judges the run from its own `ingestion_runs` history (it also writes a `health` mark on each judged run; no extra fetches, no model call, nothing is disabled or changed automatically). Each source is `HEALTHY`, `DEGRADED` (saw far fewer postings than usual) or `BROKEN` (the run failed, or found zero postings after good runs). "Saw" means new plus re-seen postings, so unchanged sitemap postings count.
+
+- Baseline: the median of the last 5 successful, complete, healthy runs from the last 14 days (at least 3 are needed, otherwise the note says "no baseline yet"). It stays frozen while a source is not healthy, and recovery needs the postings seen to reach the threshold of that frozen baseline.
+- `DEGRADED`: fewer than 30% of the baseline, and only for baselines of at least 10 postings. `BROKEN`: a failed run, or zero postings with a baseline of at least 3. A run cut short by the time budget or robots.txt is never degraded. A run whose detail pages mostly yield no postings is degraded too. A new recipe that is still growing stays healthy, and the median baseline lags behind its growth.
+- State changes are logged: WARN when a source gets worse, INFO on recovery.
+- `curl http://127.0.0.1:8081/api/health/sources` lists source, state, since, last seen, baseline and note (read-only, no secrets). It answers only to the Hosts in `INGESTION_API_ALLOWED_HOSTS` (default `localhost,127.0.0.1`); others get 403. Rows of sources that are no longer enabled show `INACTIVE`.
+- Tuning in `application.properties`: `ingestion.health.degraded-ratio` (0.3), `ingestion.health.min-baseline-broken` (3), `ingestion.health.baseline-max-age` (14d).
+
+---
+
 ## Recipe learner
 
 Off by default (`INGESTION_LEARNER_ENABLED=false`): no learner code runs and `/api/learn` does not exist. When on, it asks the model for a recipe for one careers site, checks it, tries it on a small live sample and saves it **disabled** in `./recipes-proposed` (writable for ingestion only; never loaded, never inside `./recipes`). The model call goes through scoring (`POST /api/llm/complete`) and counts against the same daily cost cap, plus its own limits (3 learn runs and $0.25 a day by default, see `apps/scoring-service/.env.sample`).

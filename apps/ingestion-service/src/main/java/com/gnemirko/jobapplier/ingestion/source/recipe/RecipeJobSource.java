@@ -194,7 +194,7 @@ public class RecipeJobSource implements JobSource {
     }
 
     private String timeNote() {
-        return "Stopped early: run time budget of " + maxRun + " reached";
+        return com.gnemirko.jobapplier.ingestion.source.RunNotes.stoppedEarly(maxRun);
     }
 
     private String template(int page) {

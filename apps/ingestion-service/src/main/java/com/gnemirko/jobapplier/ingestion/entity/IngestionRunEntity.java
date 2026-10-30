@@ -21,6 +21,7 @@ public class IngestionRunEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(nullable = false, length = 64)
@@ -60,6 +61,15 @@ public class IngestionRunEntity {
         this.updated = updated;
         this.skipped = skipped;
         this.error = error == null ? null : error.substring(0, Math.min(error.length(), 2000));
+    }
+
+    /** Health state judged for this run (null before the check ran or for older rows). */
+    @Column(length = 16)
+    @Getter
+    private String health;
+
+    public void markHealth(String state) {
+        this.health = state;
     }
 
     public Status getStatus() {

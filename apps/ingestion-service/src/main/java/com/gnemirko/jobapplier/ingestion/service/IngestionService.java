@@ -38,15 +38,17 @@ public class IngestionService {
     private final IngestionRunRepository runs;
     private final TransactionTemplate tx;
     private final Clock clock;
+    private final HealthEvaluator health;
 
     public IngestionService(SourceRegistry sources, JobQueryService queries, JobRepository jobs, IngestionRunRepository runs,
-            PlatformTransactionManager txManager, Clock clock) {
+            PlatformTransactionManager txManager, Clock clock, HealthEvaluator health) {
         this.sources = sources;
         this.queries = queries;
         this.jobs = jobs;
         this.runs = runs;
         this.tx = new TransactionTemplate(txManager);
         this.clock = clock;
+        this.health = health;
     }
 
     @Scheduled(cron = "${ingestion.cron:0 0 */6 * * *}")
@@ -58,6 +60,17 @@ public class IngestionService {
 
     /** One source, one transaction. A failure is recorded separately and never stops other sources. */
     public IngestionRunEntity runSource(JobSource source) {
+        IngestionRunEntity run = fetchAndStore(source);
+        // After the run is stored; the check never throws and a run without an id (unsaved failure) is skipped.
+        try {
+            health.evaluate(run);
+        } catch (RuntimeException e) {
+            log.warn("Health check of '{}' failed", source.name(), e);
+        }
+        return run;
+    }
+
+    private IngestionRunEntity fetchAndStore(JobSource source) {
         Instant started = clock.instant();
         try {
             FetchContext context = new FetchContext(queries.knownJobs(source.name()));

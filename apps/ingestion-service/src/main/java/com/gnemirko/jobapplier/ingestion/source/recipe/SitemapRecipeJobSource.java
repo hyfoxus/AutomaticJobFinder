@@ -132,7 +132,7 @@ public class SitemapRecipeJobSource implements JobSource {
         }
 
         if (outOfTime) {
-            notes.add("Stopped early: run time budget of " + maxRun + " reached");
+            notes.add(com.gnemirko.jobapplier.ingestion.source.RunNotes.stoppedEarly(maxRun));
         }
         if (notVisitedNew + notVisitedKnown > 0) {
             notes.add("Not visited because of the " + (outOfTime ? "time budget" : "limit of "

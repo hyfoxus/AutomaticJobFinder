@@ -137,7 +137,7 @@ public class WorkdayRecipeJobSource implements JobSource {
         }
 
         if (outOfTime) {
-            notes.add("Stopped early: run time budget of " + maxRun + " reached");
+            notes.add(com.gnemirko.jobapplier.ingestion.source.RunNotes.stoppedEarly(maxRun));
         } else if (total > seenPaths.size()) {
             notes.add("Workday reported " + total + " postings but " + seenPaths.size() + " unique were listed");
         }
