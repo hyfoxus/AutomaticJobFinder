@@ -123,6 +123,9 @@ public final class RecipeProposal {
             if (Recipe.STRATEGY_WORKDAY.equals(raw.strategy())) {
                 throw new Refused("the workday strategy is not allowed here", FB_VALIDATION);
             }
+            if (Recipe.STRATEGY_JSON_API.equals(raw.strategy()) || raw.jsonApi() != null) {
+                throw new Refused("the json-api strategy is not allowed here", FB_VALIDATION);
+            }
             Recipe locked = lockAndClamp(raw, target, name);
             try {
                 validator.validate(locked);
@@ -140,7 +143,7 @@ public final class RecipeProposal {
         }
     }
 
-    private static Recipe lockAndClamp(Recipe r, URI target, String name) {
+    static Recipe lockAndClamp(Recipe r, URI target, String name) {
         Recipe.Listing listing = r.listing();
         Recipe.Sitemap sitemap = r.sitemap();
         if (listing != null) {
@@ -162,7 +165,11 @@ public final class RecipeProposal {
         }
         Integer cap = r.limits().maxDetailFetchesPerRun();
         Recipe.Limits limits = new Recipe.Limits(cap == null ? null : Math.min(cap, MAX_DETAIL_FETCHES));
-        return new Recipe(name, false, r.strategy(), listing, sitemap, r.workday(), detail, limits);
+        Recipe.JsonApi api = r.jsonApi();
+        if (api != null) {
+            requireTargetHost(api.url(), target, "jsonApi.url");
+        }
+        return new Recipe(name, false, r.strategy(), listing, sitemap, r.workday(), detail, limits, api);
     }
 
     private static void requireTargetHost(String url, URI target, String label) {

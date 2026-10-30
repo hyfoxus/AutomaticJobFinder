@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.gnemirko.jobapplier.contracts.JobPosting;
@@ -16,6 +17,7 @@ import com.gnemirko.jobapplier.ingestion.learner.config.LearnerProperties;
 import com.gnemirko.jobapplier.ingestion.learner.util.Text;
 import com.gnemirko.jobapplier.ingestion.service.PoliteFetcher;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
+import com.gnemirko.jobapplier.ingestion.source.recipe.JsonApiRecipeJobSource;
 import com.gnemirko.jobapplier.ingestion.source.recipe.RecipeJobSource;
 import com.gnemirko.jobapplier.ingestion.source.recipe.SitemapReader;
 import com.gnemirko.jobapplier.ingestion.source.recipe.SitemapRecipeJobSource;
@@ -35,6 +37,7 @@ public class SampleRunner {
     public static final int SAMPLE_PAGES = 2;
     public static final int SAMPLE_DETAILS = 5;
     public static final int SAMPLE_SITEMAP_URLS = 20;
+    public static final int SAMPLE_API_ITEMS = 20;
     static final int MAX_TITLES = 10;
 
     /** @param ran false when the run itself failed (fetch or transport error), as opposed to finding too few postings
@@ -50,11 +53,23 @@ public class SampleRunner {
     private final PoliteFetcher fetcher;
     private final Clock clock;
     private final Duration maxRun;
+    private final java.net.URI apiBase;
 
+    @Autowired
     public SampleRunner(PoliteFetcher fetcher, Clock clock, LearnerProperties props) {
+        this(fetcher, clock, props.sampleMaxRun());
+    }
+
+    SampleRunner(PoliteFetcher fetcher, Clock clock, Duration maxRun) {
+        this(fetcher, clock, maxRun, null);
+    }
+
+    /** Tests point json-api recipes at an http stub through {@code apiBase}. */
+    SampleRunner(PoliteFetcher fetcher, Clock clock, Duration maxRun, java.net.URI apiBase) {
         this.fetcher = fetcher;
         this.clock = clock;
-        this.maxRun = props.sampleMaxRun();
+        this.maxRun = maxRun;
+        this.apiBase = apiBase;
     }
 
     /** A blocked response ({@link FetchBlockedException}) is not caught: the run must stop. */
@@ -62,11 +77,18 @@ public class SampleRunner {
         List<String> notes = new ArrayList<>();
         java.util.function.Supplier<List<String>> diagnostics = List::of;
         java.util.function.IntSupplier matched = () -> -1;
+        if (!Recipe.STRATEGY_SITEMAP.equals(recipe.strategy())
+                && !Recipe.STRATEGY_PAGINATED_LISTING.equals(recipe.strategy())
+                && !Recipe.STRATEGY_JSON_API.equals(recipe.strategy())) {
+            throw new IllegalArgumentException("no sample run for strategy " + recipe.strategy());
+        }
         Recipe copy = clampedCopy(recipe);
         FetchResult result;
         try {
             JobSource source;
-            if (Recipe.STRATEGY_SITEMAP.equals(recipe.strategy())) {
+            if (Recipe.STRATEGY_JSON_API.equals(recipe.strategy())) {
+                source = new JsonApiRecipeJobSource(copy, fetcher, clock, maxRun, apiBase);
+            } else if (Recipe.STRATEGY_SITEMAP.equals(recipe.strategy())) {
                 SitemapRecipeJobSource s = new SitemapRecipeJobSource(copy, fetcher, new SitemapReader(fetcher), clock, maxRun);
                 diagnostics = s::diagnostics;
                 matched = s::matched;
@@ -122,6 +144,14 @@ public class SampleRunner {
         if (s != null) {
             s = new Recipe.Sitemap(s.url(), s.urlPattern(), Math.min(SAMPLE_SITEMAP_URLS, s.maxUrls()), s.keepQuery());
         }
-        return new Recipe(r.name(), false, r.strategy(), l, s, r.workday(), r.detail(), limits);
+        Recipe.JsonApi a = r.jsonApi();
+        if (a != null && a.paging() != null) {
+            Recipe.Paging pg = a.paging();
+            a = new Recipe.JsonApi(a.url(), a.method(), a.query(), a.bodyTemplate(),
+                    new Recipe.Paging(pg.kind(), pg.start(), pg.size(), Math.min(SAMPLE_PAGES, pg.maxPages()),
+                            pg.totalPath()),
+                    a.itemsPath(), a.fields(), a.jobUrlTemplate(), Math.min(SAMPLE_API_ITEMS, a.maxItems()));
+        }
+        return new Recipe(r.name(), false, r.strategy(), l, s, r.workday(), r.detail(), limits, a);
     }
 }

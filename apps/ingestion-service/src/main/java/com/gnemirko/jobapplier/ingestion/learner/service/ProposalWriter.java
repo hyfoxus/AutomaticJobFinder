@@ -109,7 +109,7 @@ public class ProposalWriter {
             throw new IOException("recipe name is not allowed");
         }
         Recipe enabled = new Recipe(recipe.name(), true, recipe.strategy(), recipe.listing(), recipe.sitemap(),
-                recipe.workday(), recipe.detail(), recipe.limits());
+                recipe.workday(), recipe.detail(), recipe.limits(), recipe.jsonApi());
         try {
             validator.validate(enabled);
         } catch (IllegalArgumentException e) {

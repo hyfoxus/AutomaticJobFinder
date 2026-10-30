@@ -130,6 +130,43 @@ Health: `curl http://127.0.0.1:8084/actuator/health`. Digest status is not shown
 
 ---
 
+## JSON API recipes
+
+Some careers sites fill their job list from a JSON endpoint after the page loads. The fourth recipe strategy, `json-api`, reads such an endpoint (find it in the browser's network tab) with the same polite fetcher as the other strategies: SSRF check, robots.txt, pacing and size cap. You write the recipe by hand and put it in `./recipes`; the learner does not propose these yet. Check the site's terms of use first.
+
+```json
+{
+  "name": "acme-api",
+  "enabled": false,
+  "strategy": "json-api",
+  "jsonApi": {
+    "url": "https://careers.acme.example/api/search",
+    "method": "POST",
+    "bodyTemplate": { "filters": { "q": "java" }, "page": "${page}", "size": "${size}" },
+    "paging": { "kind": "page", "start": 1, "size": 20, "maxPages": 10, "totalPath": "meta.total" },
+    "itemsPath": "data.jobs",
+    "fields": {
+      "id": "id",
+      "title": "title",
+      "company": { "const": "Acme" },
+      "location": { "join": ["city", "country"], "sep": ", " },
+      "postedAt": "publishedAt",
+      "description": "summary"
+    },
+    "jobUrlTemplate": "https://careers.acme.example/jobs/{id}",
+    "maxItems": 500
+  }
+}
+```
+
+- `method` is `GET` (use `query`, a map of strings) or `POST` (use `bodyTemplate`, any JSON object or array). A slot is a value that is exactly `${page}`, `${offset}` or `${size}`; in a body it becomes a number, in a query value its text. Slots inside longer strings or in keys are rejected, as is any other `${`. `${size}` comes from `paging.size`. `url` carries no query, fragment or credentials and is `https`.
+- `paging.kind` is `page` (`${page}`, first value `start`, default 1) or `offset` (`${offset}`, first value `start`, default 0, then plus `size`). Paging stops on an empty page, a page with fewer than `size` items, `totalPath` reached, a page with no new ids, `maxPages` (at most 50), `maxItems` (at most 2000) or the run time limit. `size` is at most 1000.
+- `itemsPath` finds the items: a path to an array (`data.jobs`) or `[*]` for a reply that is itself an array. Paths use dotted keys, `[n]` and `[*]`; keys may only contain letters, digits, `_`, `$` and `-`. A field is a path, `{"const": "x"}` or `{"join": [paths], "sep": ", "}`. `id` and `title` are required; an integer `postedAt` below 10^11 is read as epoch seconds, otherwise milliseconds.
+- The job URL comes from exactly one of `fields.url` (absolute, or relative to the endpoint; https) or `jobUrlTemplate` with one `{id}` (ids must match `[A-Za-z0-9._~-]{1,128}` and are encoded). Items without id, title or URL are counted as skipped.
+- An optional `detail` block (`json-ld` or `embedded-json`, as for sitemap recipes) reads each new job page on the endpoint's host, bounded by `limits.maxDetailFetchesPerRun`; known URLs are not fetched again. Without it the list item is the posting.
+- A failing list page fails the run and stores nothing. 401 is reported as `needs authentication`; 403 and 429 stop the source as a block; a 200 reply that is not JSON fails with `not JSON (login page?)`; a POST is never redirected. An empty first page is an ok run with zero postings, which the health check flags.
+- Not supported: custom headers, cookies, tokens or CSRF values (a site that needs them cannot be read and is reported), and cursor or next-token paging.
+
 ## Recipe health
 
 After every source run ingestion judges the run from its own `ingestion_runs` history (it also writes a `health` mark on each judged run; no extra fetches, no model call, nothing is disabled or changed automatically). Each source is `HEALTHY`, `DEGRADED` (saw far fewer postings than usual) or `BROKEN` (the run failed, or found zero postings after good runs). "Saw" means new plus re-seen postings, so unchanged sitemap postings count.

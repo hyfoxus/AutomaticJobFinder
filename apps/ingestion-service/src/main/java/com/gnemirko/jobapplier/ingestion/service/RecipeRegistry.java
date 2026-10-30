@@ -27,6 +27,7 @@ import com.gnemirko.jobapplier.ingestion.learner.config.LearnerProperties;
 import com.gnemirko.jobapplier.ingestion.learner.service.ProposalWriter;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
 import com.gnemirko.jobapplier.ingestion.source.recipe.EmbeddedJsonParser;
+import com.gnemirko.jobapplier.ingestion.source.recipe.JsonApiValidator;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -128,6 +129,9 @@ public class RecipeRegistry {
             if (r.workday() != null) {
                 return r.workday().host();
             }
+            if (r.jsonApi() != null) {
+                return URI.create(r.jsonApi().url()).getHost();
+            }
         } catch (RuntimeException e) {
             return null;
         }
@@ -189,6 +193,9 @@ public class RecipeRegistry {
         Recipe.Sitemap sm = r.sitemap();
         Recipe.Workday wd = r.workday();
         Recipe.Detail d = r.detail();
+        if (r.jsonApi() != null && !Recipe.STRATEGY_JSON_API.equals(r.strategy())) {
+            throw new IllegalArgumentException("jsonApi block does not belong to strategy " + r.strategy());
+        }
         if (Recipe.STRATEGY_PAGINATED_LISTING.equals(r.strategy())) {
             if (sm != null) {
                 throw new IllegalArgumentException("sitemap block does not belong to strategy paginated-listing");
@@ -222,10 +229,18 @@ public class RecipeRegistry {
                 throw new IllegalArgumentException("workday is required");
             }
             validateWorkday(wd);
+        } else if (Recipe.STRATEGY_JSON_API.equals(r.strategy())) {
+            if (l != null || sm != null || wd != null) {
+                throw new IllegalArgumentException("listing, sitemap and workday blocks do not belong to strategy json-api");
+            }
+            JsonApiValidator.validate(r.jsonApi(), d);
+            if (d != null) {
+                validateDetail(d);
+            }
         } else {
             throw new IllegalArgumentException("unsupported strategy " + r.strategy());
         }
-        if (!Recipe.STRATEGY_WORKDAY.equals(r.strategy())) {
+        if (!Recipe.STRATEGY_WORKDAY.equals(r.strategy()) && !Recipe.STRATEGY_JSON_API.equals(r.strategy())) {
             if (d == null) {
                 throw new IllegalArgumentException("detail is required");
             }

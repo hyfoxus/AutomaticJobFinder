@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import com.gnemirko.jobapplier.ingestion.dto.Recipe;
 import com.gnemirko.jobapplier.ingestion.source.JobSource;
+import com.gnemirko.jobapplier.ingestion.source.recipe.JsonApiRecipeJobSource;
 import com.gnemirko.jobapplier.ingestion.source.recipe.RecipeJobSource;
 import com.gnemirko.jobapplier.ingestion.source.recipe.SitemapReader;
 import com.gnemirko.jobapplier.ingestion.source.recipe.SitemapRecipeJobSource;
@@ -47,6 +48,8 @@ public class SourceRegistry {
                     all.add(new RecipeJobSource(recipe, fetcher, clock, maxRunDuration));
                 } else if (Recipe.STRATEGY_WORKDAY.equals(strategy)) {
                     all.add(new WorkdayRecipeJobSource(recipe, fetcher, clock, maxRunDuration));
+                } else if (Recipe.STRATEGY_JSON_API.equals(strategy)) {
+                    all.add(new JsonApiRecipeJobSource(recipe, fetcher, clock, maxRunDuration));
                 } else {
                     throw new IllegalStateException("Unknown recipe strategy '" + strategy + "' in " + recipe.name());
                 }

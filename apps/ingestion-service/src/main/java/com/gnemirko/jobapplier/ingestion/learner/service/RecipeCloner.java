@@ -752,7 +752,7 @@ public class RecipeCloner {
         Recipe.Sitemap sm = t.sitemap();
         Recipe.Sitemap swapped = new Recipe.Sitemap(sm.url().replace(marker, replacement),
                 sm.urlPattern().replace(marker, replacement), sm.maxUrls(), sm.keepQuery());
-        return new Recipe(name, false, t.strategy(), null, swapped, null, t.detail(), t.limits());
+        return new Recipe(name, false, t.strategy(), null, swapped, null, t.detail(), t.limits(), t.jsonApi());
     }
 
     private static String canon(URI uri) {
